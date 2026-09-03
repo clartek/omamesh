@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import qs.Commons
 import qs.Ui
 
@@ -8,11 +9,14 @@ BarWidget {
   moduleName: "clartek.omamesh"
 
   readonly property bool opened: panelLoader.item ? panelLoader.item.opened === true : false
+  readonly property string connectionState: panelLoader.item ? panelLoader.item.connectionState : "unavailable"
+  readonly property int unreadCount: panelLoader.item ? panelLoader.item.unreadCount : 0
   readonly property real openPanelIndicatorWidth: button.width
 
   function open() { if (panelLoader.item) panelLoader.item.open() }
   function close() { if (panelLoader.item) panelLoader.item.close() }
   function togglePanel() { if (panelLoader.item) panelLoader.item.toggle() }
+  function refresh() { if (panelLoader.item) panelLoader.item.refresh() }
   function closeForPopoutSwitch() { if (panelLoader.item) panelLoader.item.closeForPopoutSwitch() }
 
   function injectPanel() {
@@ -26,6 +30,9 @@ BarWidget {
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
+
+  onBarChanged: injectPanel()
+  onSettingsChanged: injectPanel()
 
   Loader {
     id: panelLoader
@@ -51,13 +58,16 @@ BarWidget {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: "󰛳"
+    text: root.unreadCount > 0 ? "󰛳 " + root.unreadCount : "󰛳"
+    active: root.unreadCount > 0
+    dimmed: root.connectionState !== "connected" && root.unreadCount === 0
+    tooltipText: root.connectionState === "connected" ? "Omamesh connected" : "Omamesh disconnected"
     labelVisible: true
     horizontalMargin: 8.75
     verticalPadding: 8.75
     onPressed: function(mouseButton) {
-      if (mouseButton === Qt.LeftButton) root.togglePanel()
+      if (mouseButton === Qt.MiddleButton) root.refresh()
+      else if (mouseButton === Qt.LeftButton) root.togglePanel()
     }
   }
 }
-

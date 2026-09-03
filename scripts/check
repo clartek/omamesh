@@ -6,8 +6,14 @@ project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$project_dir"
 python3 -m json.tool manifest.json >/dev/null
 python3 -m json.tool fixtures/disconnected.json >/dev/null
+python3 -m json.tool fixtures/connected-usb.json >/dev/null
+node tests/model.test.mjs
 omarchy plugin validate "$project_dir"
 git diff --check -- .
+
+if command -v quickshell >/dev/null 2>&1; then
+  quickshell --version >/dev/null
+fi
 
 if command -v meshcore-cli >/dev/null 2>&1; then
   printf 'meshcore-cli: %s\n' "$(command -v meshcore-cli)"
@@ -15,5 +21,4 @@ else
   printf '%s\n' 'meshcore-cli: not installed (backend integration remains disabled)'
 fi
 
-printf '%s\n' 'OmaMesh checks passed.'
-
+printf '%s\n' 'Omamesh checks passed.'

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "clartek.omamesh",
-  "name": "OmaMesh",
+  "name": "Omamesh",
   "version": "0.1.0",
   "author": "Josh Clarke",
   "license": "MIT",
@@ -13,15 +13,23 @@
     "barWidget": "BarWidget.qml"
   },
   "barWidget": {
-    "displayName": "OmaMesh",
+    "displayName": "Omamesh",
     "description": "Connect to MeshCore companions over BLE, USB, or TCP/IP.",
     "category": "Network",
     "allowMultiple": false,
     "defaultSection": "right",
     "defaults": {
-      "refreshIntervalSec": 10
+      "serialPort": "/dev/ttyACM0",
+      "refreshIntervalSec": 10,
+      "commandTimeoutSec": 12
     },
     "schema": [
+      {
+        "key": "serialPort",
+        "type": "string",
+        "label": "USB serial port",
+        "defaultValue": "/dev/ttyACM0"
+      },
       {
         "key": "refreshIntervalSec",
         "type": "integer",
@@ -30,8 +38,16 @@
         "max": 300,
         "step": 1,
         "defaultValue": 10
+      },
+      {
+        "key": "commandTimeoutSec",
+        "type": "integer",
+        "label": "Command timeout (seconds)",
+        "min": 3,
+        "max": 60,
+        "step": 1,
+        "defaultValue": 12
       }
     ]
   }
 }
-

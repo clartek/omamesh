@@ -1,0 +1,36 @@
+{
+  "connectionState": "connected",
+  "transport": "serial",
+  "companion": {
+    "name": "Omamesh fixture"
+  },
+  "nodes": [
+    {
+      "name": "Casey",
+      "type": 1,
+      "typeLabel": "Direct",
+      "icon": "user",
+      "shortId": "09069e…cfaccf",
+      "route": "Flood",
+      "unreadCount": 0
+    },
+    {
+      "name": "Hilltop Repeater",
+      "type": 2,
+      "typeLabel": "Repeater",
+      "icon": "repeater",
+      "shortId": "d21f8e…c6c826",
+      "route": "2 hops",
+      "unreadCount": 0
+    }
+  ],
+  "channels": [
+    {
+      "index": 0,
+      "name": "Public",
+      "kind": "Public channel",
+      "unreadCount": 0
+    }
+  ],
+  "messages": []
+}

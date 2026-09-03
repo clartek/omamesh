@@ -1,8 +1,8 @@
-# OmaMesh development guidance
+# Omamesh development guidance
 
 ## Product
 
-OmaMesh is an Omarchy Quattro bar plugin for MeshCore. It uses
+Omamesh is an Omarchy Quattro bar plugin for MeshCore. It uses
 `meshcore-cli` as its only backend boundary and will support BLE, USB/serial,
 and TCP/IP companion connections. The visual language should recall the
 official MeshCore mobile app while using Omarchy typography, spacing, color,
@@ -39,4 +39,3 @@ panel, focus, and keyboard conventions.
 3. Normalize companion, node, channel, and message data behind the service.
 4. Build read-only UI states using fixtures before enabling send actions.
 5. Add messaging only after identity, channel, and error semantics are tested.
-
