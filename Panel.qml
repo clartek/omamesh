@@ -17,8 +17,9 @@ Panel {
   property string conversationTitle: ""
   property var detailNode: null
   property string searchQuery: ""
+  property int contactTypeFilter: -1
   readonly property var conversationMessages: Model.messagesForConversation(meshcore.messages, conversationId)
-  readonly property var filteredNodes: Model.filterByText(meshcore.nodes, searchQuery)
+  readonly property var filteredNodes: Model.filterContacts(meshcore.nodes, searchQuery, contactTypeFilter)
   readonly property var filteredChannels: Model.filterByText(meshcore.channels, searchQuery)
   readonly property var barIdentity: hostWidget || root
   readonly property color foreground: bar ? bar.foreground : Color.foreground
@@ -46,6 +47,18 @@ Panel {
     else { root.conversationId = ""; root.detailNode = item }
   }
   function leaveSubview() { root.conversationId = ""; root.conversationTitle = ""; root.detailNode = null }
+  function cycleContactFilter() {
+    var values = [-1, 1, 2, 3, 4]
+    var index = values.indexOf(root.contactTypeFilter)
+    root.contactTypeFilter = values[(index + 1) % values.length]
+  }
+  function contactFilterLabel() {
+    if (root.contactTypeFilter === 1) return "Direct"
+    if (root.contactTypeFilter === 2) return "Repeaters"
+    if (root.contactTypeFilter === 3) return "Rooms"
+    if (root.contactTypeFilter === 4) return "Sensors"
+    return "All"
+  }
   function switchPanel(direction) {
     if (root.bar && typeof root.bar.switchPanelFrom === "function")
       return root.bar.switchPanelFrom(root.barIdentity, direction)
@@ -119,15 +132,47 @@ Panel {
 
         Rectangle { width: parent.width; height: 1; color: Style.hoverFillFor(root.foreground, Color.accent) }
 
-        TextField {
-          id: searchField
+        Row {
           width: parent.width
           visible: root.conversationId === "" && root.detailNode === null && root.selectedTab < 2 && meshcore.connectionState === "connected"
-          placeholderText: root.selectedTab === 0 ? "Search contacts…" : "Search channels…"
-          text: root.searchQuery
-          foreground: root.foreground
-          accent: Color.accent
-          onTextChanged: root.searchQuery = text
+          height: Style.space(40)
+          spacing: Style.space(6)
+
+          TextField {
+            id: searchField
+            width: parent.width - (contactFilterButton.visible ? contactFilterButton.width + parent.spacing : 0)
+            height: parent.height
+            placeholderText: root.selectedTab === 0 ? "Search contacts…" : "Search channels…"
+            text: root.searchQuery
+            foreground: root.foreground
+            accent: Color.accent
+            onTextChanged: root.searchQuery = text
+          }
+
+          Rectangle {
+            id: contactFilterButton
+            visible: root.selectedTab === 0
+            width: Style.space(94)
+            height: parent.height
+            radius: Style.cornerRadius
+            color: root.contactTypeFilter !== -1 || contactFilterMouse.containsMouse
+              ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
+            border.width: 1
+            border.color: Style.hoverFillFor(root.foreground, Color.accent)
+            Row {
+              anchors.centerIn: parent
+              spacing: Style.space(5)
+              Text { text: "󰈲"; color: root.contactTypeFilter === -1 ? root.dim : Color.accent; font.family: root.fontFamily; font.pixelSize: Style.font.icon }
+              Text { text: root.contactFilterLabel(); color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
+            }
+            MouseArea {
+              id: contactFilterMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.cycleContactFilter()
+            }
+          }
         }
 
         Item {
@@ -144,7 +189,7 @@ Panel {
             id: contactList
             anchors.fill: parent; visible: meshcore.connectionState === "connected" && root.conversationId === "" && root.detailNode === null && root.selectedTab === 0
             clip: true; model: root.filteredNodes; spacing: Style.space(3)
-            header: Text { width: contactList.width; height: Style.space(32); textFormat: Text.PlainText; text: meshcore.nodes.length === 0 ? "Listening for nearby contacts…" : (root.filteredNodes.length === 0 ? "NO MATCHING CONTACTS" : (meshcore.radioText ? "CONTACTS  ·  " + meshcore.radioText : "CONTACTS")); color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; font.letterSpacing: 1; elide: Text.ElideRight }
+            header: Text { width: contactList.width; height: Style.space(32); textFormat: Text.PlainText; text: meshcore.nodes.length === 0 ? "Listening for nearby contacts…" : (root.filteredNodes.length === 0 ? "NO MATCHING CONTACTS" : (root.contactTypeFilter === -1 && meshcore.radioText ? "CONTACTS  ·  " + meshcore.radioText : root.contactFilterLabel().toUpperCase())); color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; font.letterSpacing: 1; elide: Text.ElideRight }
             delegate: Rectangle {
               required property var modelData
               width: contactList.width; height: Style.space(66); radius: Style.cornerRadius

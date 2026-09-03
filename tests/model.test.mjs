@@ -77,6 +77,9 @@ assert.equal(conversation[0].timestamp, 1234)
 assert.match(model.timeLabel(Math.floor(Date.now() / 1000)), /^\d{1,2}:\d{2} (AM|PM)$/)
 assert.equal(model.filterByText(contacts.items, "repeater").length, 1)
 assert.equal(model.filterByText(contacts.items, "does-not-exist").length, 0)
+assert.equal(model.filterContacts(contacts.items, "", 2).length, 1)
+assert.equal(model.filterContacts(contacts.items, "", 1).length, 0)
+assert.equal(model.filterContacts(contacts.items, "repeater", -1).length, 1)
 assert.equal(
   model.safeCliError("permission denied for /dev/ttyACM0", false),
   "Permission denied for the USB serial device"

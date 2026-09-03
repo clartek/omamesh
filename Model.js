@@ -354,6 +354,19 @@ function filterByText(items, query) {
   return result
 }
 
+function filterContacts(items, query, type) {
+  var list = filterByText(items, query)
+  var wanted = Number(type)
+  if (!isFinite(wanted) || wanted < 0) return list
+  var result = []
+  for (var i = 0; i < list.length; i++) {
+    var itemType = Number(list[i] && list[i].type)
+    if (isFinite(itemType) && Math.floor(itemType) === Math.floor(wanted))
+      result.push(list[i])
+  }
+  return result
+}
+
 function timeLabel(timestamp) {
   var seconds = Number(timestamp)
   if (!isFinite(seconds) || seconds <= 0) return ""
