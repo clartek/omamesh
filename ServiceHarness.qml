@@ -2,9 +2,10 @@ import QtQuick
 import Quickshell
 
 ShellRoot {
+  readonly property bool expectMessage: Quickshell.env("OMAMESH_EXPECT_MESSAGE") === "1"
+
   MeshCoreService {
     id: service
-    property bool sawConnected: false
     settings: ({
       serialPort: "/dev/ttyACM0",
       refreshIntervalSec: 300,
@@ -12,17 +13,15 @@ ShellRoot {
     })
 
     onConnectionStateChanged: {
-      if (connectionState === "connected") {
-        sawConnected = true
-      } else if (connectionState === "error" || connectionState === "unavailable") {
+      if (connectionState === "error" || connectionState === "unavailable") {
         console.error("OMAMESH_SMOKE_FAILED:" + connectionState + ":" + lastError)
         Qt.exit(1)
       }
     }
 
     onBusyChanged: {
-      if (sawConnected && !busy) {
-        console.info("OMAMESH_SMOKE_CONNECTED:contacts=" + nodes.length + ":channels=" + channels.length)
+      if (live && !busy && (!expectMessage || messages.length === 1)) {
+        console.info("OMAMESH_SMOKE_LIVE:contacts=" + nodes.length + ":channels=" + channels.length + ":messages=" + messages.length + ":unread=" + unreadCount)
         Qt.quit()
       }
     }

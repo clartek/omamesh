@@ -3,6 +3,7 @@ import Quickshell
 import qs.Commons
 import qs.Ui
 import "." 1.0
+import "Model.js" as Model
 
 Panel {
   id: root
@@ -12,6 +13,13 @@ Panel {
   property var anchorItem: null
   property var hostWidget: null
   property int selectedTab: 0
+  property string conversationId: ""
+  property string conversationTitle: ""
+  property var detailNode: null
+  property string searchQuery: ""
+  readonly property var conversationMessages: Model.messagesForConversation(meshcore.messages, conversationId)
+  readonly property var filteredNodes: Model.filterByText(meshcore.nodes, searchQuery)
+  readonly property var filteredChannels: Model.filterByText(meshcore.channels, searchQuery)
   readonly property var barIdentity: hostWidget || root
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property color urgent: bar ? bar.urgent : Color.urgent
@@ -27,6 +35,17 @@ Panel {
   function closeForPopoutSwitch() { root.close() }
   function refresh() { meshcore.refresh() }
   function selectTab(index) { root.selectedTab = Math.max(0, Math.min(2, index)) }
+  function openConversation(id, title) {
+    root.detailNode = null
+    root.conversationId = String(id || "")
+    root.conversationTitle = String(title || "Conversation")
+    meshcore.markConversationRead(root.conversationId)
+  }
+  function openNode(item) {
+    if (Number(item.type) === 1) root.openConversation("contact:" + item.keyPrefix, item.name)
+    else { root.conversationId = ""; root.detailNode = item }
+  }
+  function leaveSubview() { root.conversationId = ""; root.conversationTitle = ""; root.detailNode = null }
   function switchPanel(direction) {
     if (root.bar && typeof root.bar.switchPanelFrom === "function")
       return root.bar.switchPanelFrom(root.barIdentity, direction)
@@ -48,8 +67,8 @@ Panel {
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
-      onReturnRequested: meshcore.refresh()
-      onCloseRequested: root.close()
+      onReturnRequested: if (root.conversationId === "") meshcore.refresh()
+      onCloseRequested: (root.conversationId !== "" || root.detailNode !== null) ? root.leaveSubview() : root.close()
       onTabRequested: function(direction) { root.switchPanel(direction) }
       onTextKey: function(text) {
         if (text === "r" || text === "R") meshcore.refresh()
@@ -58,6 +77,7 @@ Panel {
         else if (text === "1") root.selectTab(0)
         else if (text === "2") root.selectTab(1)
         else if (text === "3") root.selectTab(2)
+        else if (text === "/" && root.conversationId === "" && root.detailNode === null && root.selectedTab < 2) searchField.forceActiveFocus()
       }
 
       Column {
@@ -78,7 +98,9 @@ Panel {
             Text { width: parent.width; textFormat: Text.PlainText; text: meshcore.companion ? meshcore.companion.name : "Omamesh"; color: root.foreground; elide: Text.ElideRight; font.family: root.fontFamily; font.pixelSize: Style.font.title; font.bold: true }
             Text {
               width: parent.width; textFormat: Text.PlainText
-              text: meshcore.connectionState === "connected" ? "USB connected  ·  " + meshcore.nodes.length + " contacts" : (meshcore.lastError || meshcore.statusText)
+              text: meshcore.connectionState === "connected"
+                ? (meshcore.batteryText ? meshcore.batteryText + "  ·  " : "") + "USB connected  ·  " + meshcore.nodes.length + (meshcore.nodes.length === 1 ? " contact" : " contacts")
+                : (meshcore.lastError || meshcore.statusText)
               color: meshcore.connectionState === "error" ? root.urgent : root.dim
               elide: Text.ElideRight; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall
             }
@@ -97,8 +119,20 @@ Panel {
 
         Rectangle { width: parent.width; height: 1; color: Style.hoverFillFor(root.foreground, Color.accent) }
 
+        TextField {
+          id: searchField
+          width: parent.width
+          visible: root.conversationId === "" && root.detailNode === null && root.selectedTab < 2 && meshcore.connectionState === "connected"
+          placeholderText: root.selectedTab === 0 ? "Search contacts…" : "Search channels…"
+          text: root.searchQuery
+          foreground: root.foreground
+          accent: Color.accent
+          onTextChanged: root.searchQuery = text
+        }
+
         Item {
-          width: parent.width; height: parent.height - Style.space(116)
+          width: parent.width
+          height: parent.height - Style.space(searchField.visible ? 156 : 116)
           Column {
             anchors.centerIn: parent; width: parent.width; visible: meshcore.connectionState !== "connected"; spacing: Style.space(8)
             Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; text: "󰛳"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.space(40) }
@@ -108,9 +142,9 @@ Panel {
 
           ListView {
             id: contactList
-            anchors.fill: parent; visible: meshcore.connectionState === "connected" && root.selectedTab === 0
-            clip: true; model: meshcore.nodes; spacing: Style.space(3)
-            header: Text { width: contactList.width; height: Style.space(32); textFormat: Text.PlainText; text: meshcore.nodes.length === 0 ? "Listening for nearby contacts…" : "CONTACTS"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; font.letterSpacing: 1 }
+            anchors.fill: parent; visible: meshcore.connectionState === "connected" && root.conversationId === "" && root.detailNode === null && root.selectedTab === 0
+            clip: true; model: root.filteredNodes; spacing: Style.space(3)
+            header: Text { width: contactList.width; height: Style.space(32); textFormat: Text.PlainText; text: meshcore.nodes.length === 0 ? "Listening for nearby contacts…" : (root.filteredNodes.length === 0 ? "NO MATCHING CONTACTS" : (meshcore.radioText ? "CONTACTS  ·  " + meshcore.radioText : "CONTACTS")); color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; font.letterSpacing: 1; elide: Text.ElideRight }
             delegate: Rectangle {
               required property var modelData
               width: contactList.width; height: Style.space(66); radius: Style.cornerRadius
@@ -120,20 +154,26 @@ Panel {
                 Rectangle { width: Style.space(42); height: width; radius: width / 2; color: Color.accent; anchors.verticalCenter: parent.verticalCenter
                   Text { anchors.centerIn: parent; text: modelData.icon; color: Color.background; font.family: root.fontFamily; font.pixelSize: Style.font.iconLarge }
                 }
-                Column { width: parent.width - Style.space(54); anchors.verticalCenter: parent.verticalCenter; spacing: Style.space(3)
+                Column { width: parent.width - Style.space(88); anchors.verticalCenter: parent.verticalCenter; spacing: Style.space(3)
                   Text { width: parent.width; text: modelData.name; textFormat: Text.PlainText; elide: Text.ElideRight; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
                   Text { width: parent.width; text: (modelData.shortId ? modelData.shortId + "  ·  " : "") + modelData.route + "  ·  " + modelData.typeLabel; textFormat: Text.PlainText; elide: Text.ElideRight; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
                 }
+                Rectangle {
+                  visible: Number(modelData.unreadCount) > 0
+                  width: Style.space(27); height: width; radius: width / 2
+                  color: root.urgent; anchors.verticalCenter: parent.verticalCenter
+                  Text { anchors.centerIn: parent; text: Math.min(99, Number(modelData.unreadCount)); color: Color.background; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.bold: true }
+                }
               }
-              MouseArea { id: rowMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor }
+              MouseArea { id: rowMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.openNode(modelData) }
             }
           }
 
           ListView {
             id: channelList
-            anchors.fill: parent; visible: meshcore.connectionState === "connected" && root.selectedTab === 1
-            clip: true; model: meshcore.channels; spacing: Style.space(3)
-            header: Text { width: channelList.width; height: Style.space(32); text: meshcore.channels.length === 0 ? "No configured channels" : "CHANNELS"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; font.letterSpacing: 1 }
+            anchors.fill: parent; visible: meshcore.connectionState === "connected" && root.conversationId === "" && root.detailNode === null && root.selectedTab === 1
+            clip: true; model: root.filteredChannels; spacing: Style.space(3)
+            header: Text { width: channelList.width; height: Style.space(32); text: meshcore.channels.length === 0 ? "No configured channels" : (root.filteredChannels.length === 0 ? "NO MATCHING CHANNELS" : "CHANNELS"); color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; font.letterSpacing: 1 }
             delegate: Rectangle {
               required property var modelData
               width: channelList.width; height: Style.space(64); radius: Style.cornerRadius
@@ -143,17 +183,136 @@ Panel {
                 Rectangle { width: Style.space(42); height: width; radius: width / 2; color: Color.accent; anchors.verticalCenter: parent.verticalCenter
                   Text { anchors.centerIn: parent; text: "󰒍"; color: Color.background; font.family: root.fontFamily; font.pixelSize: Style.font.iconLarge }
                 }
-                Column { width: parent.width - Style.space(54); anchors.verticalCenter: parent.verticalCenter; spacing: Style.space(3)
+                Column { width: parent.width - Style.space(88); anchors.verticalCenter: parent.verticalCenter; spacing: Style.space(3)
                   Text { width: parent.width; text: modelData.name; textFormat: Text.PlainText; elide: Text.ElideRight; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
                   Text { width: parent.width; text: modelData.kind + "  ·  Slot " + modelData.index; textFormat: Text.PlainText; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
                 }
+                Rectangle {
+                  visible: Number(modelData.unreadCount) > 0
+                  width: Style.space(27); height: width; radius: width / 2
+                  color: root.urgent; anchors.verticalCenter: parent.verticalCenter
+                  Text { anchors.centerIn: parent; text: Math.min(99, Number(modelData.unreadCount)); color: Color.background; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.bold: true }
+                }
               }
-              MouseArea { id: channelMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor }
+              MouseArea { id: channelMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.openConversation("channel:" + modelData.index, modelData.name) }
             }
           }
 
           Column {
-            anchors.centerIn: parent; width: parent.width; visible: meshcore.connectionState === "connected" && root.selectedTab === 2; spacing: Style.space(8)
+            anchors.fill: parent
+            visible: meshcore.connectionState === "connected" && root.conversationId !== ""
+            spacing: Style.space(8)
+
+            Row {
+              width: parent.width; height: Style.space(38); spacing: Style.space(8)
+              Rectangle {
+                width: Style.space(34); height: width; radius: Style.cornerRadius
+                color: backMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
+                Text { anchors.centerIn: parent; text: "󰁍"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.icon }
+                MouseArea { id: backMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.leaveSubview() }
+              }
+              Column {
+                width: parent.width - Style.space(42); anchors.verticalCenter: parent.verticalCenter
+                Text { width: parent.width; text: root.conversationTitle; textFormat: Text.PlainText; elide: Text.ElideRight; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
+                Text { width: parent.width; text: root.conversationId.indexOf("channel:") === 0 ? "Channel messages" : "Direct messages"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
+              }
+            }
+
+            Item {
+              width: parent.width; height: parent.height - Style.space(100)
+              Text {
+                anchors.centerIn: parent; visible: root.conversationMessages.length === 0
+                text: "No messages yet"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.body
+              }
+              ListView {
+                id: messageList
+                anchors.fill: parent; visible: root.conversationMessages.length > 0
+                clip: true; spacing: Style.space(8); model: root.conversationMessages
+                onCountChanged: if (count > 0) positionViewAtEnd()
+                delegate: Item {
+                  required property var modelData
+                  width: messageList.width; height: messageBubble.height + messageTime.height + Style.space(5)
+                  Rectangle {
+                    id: messageBubble
+                    anchors.left: modelData.incoming ? parent.left : undefined
+                    anchors.right: modelData.incoming ? undefined : parent.right
+                    width: Math.min(messageList.width * 0.78, messageText.implicitWidth + Style.space(24))
+                    height: messageText.implicitHeight + Style.space(16)
+                    radius: Style.cornerRadius
+                    color: modelData.incoming ? Style.hoverFillFor(root.foreground, Color.accent) : Color.accent
+                    Text {
+                      id: messageText
+                      anchors.centerIn: parent; width: Math.min(messageList.width * 0.7, implicitWidth)
+                      text: modelData.body; textFormat: Text.PlainText; wrapMode: Text.Wrap
+                      color: modelData.incoming ? root.foreground : Color.background
+                      font.family: root.fontFamily; font.pixelSize: Style.font.body
+                    }
+                  }
+                  Text {
+                    id: messageTime
+                    anchors.top: messageBubble.bottom
+                    anchors.left: modelData.incoming ? parent.left : undefined
+                    anchors.right: modelData.incoming ? undefined : parent.right
+                    text: Model.timeLabel(modelData.timestamp); color: root.dim
+                    font.family: root.fontFamily; font.pixelSize: Style.font.caption
+                  }
+                }
+              }
+            }
+
+            Rectangle {
+              width: parent.width; height: Style.space(46); radius: Style.cornerRadius
+              color: Style.hoverFillFor(root.foreground, Color.accent)
+              Text { anchors.centerIn: parent; text: "Read-only preview · Sending is next"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
+            }
+          }
+
+          Column {
+            anchors.fill: parent
+            visible: meshcore.connectionState === "connected" && root.detailNode !== null
+            spacing: Style.space(12)
+
+            Row {
+              width: parent.width; height: Style.space(38); spacing: Style.space(8)
+              Rectangle {
+                width: Style.space(34); height: width; radius: Style.cornerRadius
+                color: detailBackMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
+                Text { anchors.centerIn: parent; text: "󰁍"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.icon }
+                MouseArea { id: detailBackMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.leaveSubview() }
+              }
+              Text { width: parent.width - Style.space(42); anchors.verticalCenter: parent.verticalCenter; text: "Contact details"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
+            }
+
+            Rectangle {
+              width: parent.width; height: detailIdentity.implicitHeight + Style.space(28); radius: Style.cornerRadius
+              color: Style.hoverFillFor(root.foreground, Color.accent)
+              Row {
+                id: detailIdentity
+                anchors.left: parent.left; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                anchors.margins: Style.space(14); spacing: Style.space(12)
+                Rectangle { width: Style.space(48); height: width; radius: width / 2; color: Color.accent
+                  Text { anchors.centerIn: parent; text: root.detailNode ? root.detailNode.icon : ""; color: Color.background; font.family: root.fontFamily; font.pixelSize: Style.font.iconLarge }
+                }
+                Column { width: parent.width - Style.space(60); anchors.verticalCenter: parent.verticalCenter; spacing: Style.space(4)
+                  Text { width: parent.width; text: root.detailNode ? root.detailNode.name : ""; textFormat: Text.PlainText; elide: Text.ElideRight; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.title; font.bold: true }
+                  Text { width: parent.width; text: root.detailNode ? root.detailNode.typeLabel : ""; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
+                }
+              }
+            }
+
+            Column {
+              width: parent.width; spacing: Style.space(8)
+              Text { text: "IDENTIFIER"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
+              Text { width: parent.width; text: root.detailNode ? root.detailNode.shortId : ""; textFormat: Text.PlainText; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body }
+              Text { text: "ROUTE"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
+              Text { width: parent.width; text: root.detailNode ? root.detailNode.route : ""; textFormat: Text.PlainText; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body }
+            }
+
+            Text { width: parent.width; wrapMode: Text.WordWrap; text: root.detailNode && Number(root.detailNode.type) === 2 ? "Repeater telemetry and remote management are planned for a later milestone." : "Telemetry and node actions are planned for a later milestone."; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
+          }
+
+          Column {
+            anchors.centerIn: parent; width: parent.width; visible: meshcore.connectionState === "connected" && root.conversationId === "" && root.detailNode === null && root.selectedTab === 2; spacing: Style.space(8)
             Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; text: "󰆋"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.space(42) }
             Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; text: "Network map"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.title; font.bold: true }
             Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; text: "Location data and map rendering are coming after contact discovery."; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.body }
@@ -161,7 +320,7 @@ Panel {
         }
 
         Row {
-          width: parent.width; height: Style.space(48); spacing: Style.space(4)
+          width: parent.width; height: Style.space(48); spacing: Style.space(4); visible: root.conversationId === "" && root.detailNode === null
           Repeater {
             model: [ { label: "Contacts", icon: "󰀄" }, { label: "Channels", icon: "󰒍" }, { label: "Map", icon: "󰆋" } ]
             delegate: Rectangle {

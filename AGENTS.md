@@ -25,6 +25,7 @@ panel, focus, and keyboard conventions.
 ## Omarchy constraints
 
 - Never edit `/usr/share/omarchy`.
+- Never use em dashes in documentation.
 - The plugin ID is `clartek.omamesh`; keep it consistent everywhere.
 - Use `qs.Commons`, `qs.Ui`, and Omarchy `Style`/`Color` tokens.
 - Preserve keyboard navigation, panel switching, and Escape-to-close behavior.

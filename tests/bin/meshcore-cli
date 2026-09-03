@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+args=" $* "
+
+if [[ "$args" == *" -v "* ]]; then
+  printf '%s\n' 'meshcore-cli fake-1.0'
+elif [[ "$args" == *" get name "* ]]; then
+  printf '%s\n' '"Fixture Companion"'
+elif [[ "$args" == *" contacts "* && "$args" != *" -i "* ]]; then
+  printf '%s\n' '{"fixture":{"adv_name":"Fixture Friend","type":1,"public_key":"00112233445566778899aabbccddeeff","out_path_len":0}}'
+elif [[ "$args" == *" get_channels "* && "$args" != *" -i "* ]]; then
+  printf '%s\n' '[{"channel_idx":0,"channel_name":"Public","channel_hash":"discard","channel_secret":"discard"}]'
+elif [[ "$args" == *" -i "* ]]; then
+  while IFS= read -r line; do
+    case "$line" in
+      "echo __OMAMESH_READY__") printf '%s\n' '__OMAMESH_READY__' ;;
+      "echo __OMAMESH_CONTACTS__") printf '%s\n' '__OMAMESH_CONTACTS__' ;;
+      contacts) printf '%s\n' '{"fixture":{"adv_name":"Fixture Friend","type":1,"public_key":"00112233445566778899aabbccddeeff","out_path_len":0}}' ;;
+      "echo __OMAMESH_CHANNELS__") printf '%s\n' '__OMAMESH_CHANNELS__' ;;
+      get_channels) printf '%s\n' '[{"channel_idx":0,"channel_name":"Public","channel_hash":"discard","channel_secret":"discard"}]' ;;
+      "echo __OMAMESH_BATTERY__") printf '%s\n' '__OMAMESH_BATTERY__' ;;
+      "get bat") printf '%s\n' '{"level":3650,"used_kb":1,"total_kb":10}' ;;
+      "echo __OMAMESH_RADIO__") printf '%s\n' '__OMAMESH_RADIO__' ;;
+      "get radio") printf '%s\n' '{"radio_freq":910.525,"radio_bw":62.5,"radio_sf":7,"radio_cr":5,"repeat":false}' ;;
+      msgs_subscribe) printf '%s\n' '{"type":"PRIV","pubkey_prefix":"001122334455","sender_timestamp":1788400000,"text":"fixture message","path_len":0}' ;;
+      quit) exit 0 ;;
+    esac
+  done
+fi

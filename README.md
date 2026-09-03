@@ -6,8 +6,9 @@ and an Omarchy-native panel inspired by the information hierarchy of the
 official MeshCore mobile app.
 
 > [!IMPORTANT]
-> Omamesh is an early development preview. USB contact and channel browsing
-> works, but messaging, maps, BLE, and TCP are not implemented yet.
+> Omamesh is an early development preview. USB contacts, channels, incoming
+> message synchronization, and read-only conversations work. Sending, maps,
+> BLE, and TCP are not implemented yet.
 
 ## Current status
 
@@ -22,9 +23,12 @@ The current USB milestone has been tested with:
 | Detect `meshcore-cli` | Working |
 | USB Serial Companion connection | Working |
 | Companion name and connection state | Working |
+| Companion battery and radio status | Working |
+| Persistent event session and reconnect | Working |
 | Contact discovery and browsing | Working |
 | Configured channel browsing | Working |
-| Direct and channel messages | Not implemented |
+| Incoming direct and channel messages | Working preview |
+| Read-only conversations and unread state | Working preview |
 | Sending messages | Not implemented |
 | Network map | Placeholder |
 | BLE and TCP companions | Not implemented |
@@ -61,6 +65,7 @@ device.
 - Click the bar icon to open or close the panel.
 - Middle-click the bar icon to refresh.
 - Press `R` or `Enter` in the panel to refresh.
+- Press `/` on Contacts or Channels to focus search.
 - Press `H`/`L` or `1`/`2`/`3` to switch between Contacts, Channels, and Map.
 - Press `Tab`/`Shift+Tab` to switch Omarchy panels.
 - Press `Escape` to close the panel.
@@ -71,9 +76,10 @@ device.
 ./scripts/check
 ```
 
-The checks validate metadata and fixtures, run the pure model tests, validate
-the plugin with Omarchy, and check the working tree for whitespace errors.
-`ServiceHarness.qml` provides an additional live USB smoke test for developers.
+The checks validate metadata and fixtures, run the pure model tests, exercise a
+deterministic persistent CLI session, validate the plugin with Omarchy, and
+check the working tree for whitespace errors. `ServiceHarness.qml` also
+provides a live USB smoke test for developers.
 
 ## Architecture and security
 
@@ -92,11 +98,11 @@ See [`docs/architecture.md`](docs/architecture.md) and
 
 ## Roadmap
 
-1. Persistent CLI event handling and complete companion status
-2. Contact search, filtering, details, paths, and telemetry
-3. Incoming message synchronization, local history, and unread state
-4. Read-only direct and channel conversations
-5. Direct and channel message sending with acknowledgment and failure states
+1. Harden persistent CLI compatibility and companion status
+2. Complete contact filtering, details, paths, and telemetry
+3. Harden incoming synchronization, bounded local history, and unread state
+4. Polish read-only direct and channel conversations
+5. Add direct and channel sending with acknowledgment and failure states
 6. Channel and contact management
 7. Location-aware network map
 8. TCP and BLE companion transports through `meshcore-cli`

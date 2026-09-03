@@ -30,6 +30,8 @@ Relevant global options reported by 1.6.3 are:
 - `-s PORT`: connect to a serial companion
 - `-b BAUD`: override the serial baud rate
 - `-T SECONDS`: discovery timeout
+- `-i`: remain in an interactive command loop
+- `-c on/off`: control decorative color output
 
 The long option `--version` is not supported. Use `-v`.
 
@@ -65,8 +67,31 @@ the normalization boundary.
 ["meshcore-cli", "-j", "-s", PORT, "get_channels"]
 ```
 
-The service runs identity, contacts, and channels sequentially because each
-CLI invocation independently owns the serial connection.
+The service runs identity, contacts, and channels sequentially during initial
+validation because each one-shot CLI invocation independently owns the serial
+connection. It then starts one persistent session:
+
+```text
+["meshcore-cli", "-j", "-c", "off", "-s", PORT, "-i"]
+```
+
+The service enables advert, new-contact, and path-update events, subscribes to
+messages, and requests contacts, channels, battery, and radio snapshots through
+that session. Marker commands correlate pretty-printed JSON documents with
+their request without depending on terminal prompts or ANSI formatting.
+
+Observed battery data reports millivolts in `level`. Observed radio data uses
+`radio_freq`, `radio_bw`, `radio_sf`, and `radio_cr`. Every field remains
+optional at the normalization boundary.
+
+Incoming direct and channel records use `PRIV` and `CHAN` type values. Omamesh
+validates and bounds message history before exposing it to the UI. It never
+logs message bodies.
+
+Advert, new-contact, and path-update events trigger a debounced snapshot rather
+than being trusted as complete contact records. A terminated persistent session
+enters an error state and reconnects after a bounded delay. This reconnect path
+has been verified against the USB companion.
 
 ## Confirmed failure behavior
 
@@ -87,13 +112,21 @@ exiting with status zero when the configured serial path did not exist. A zero
 exit status is therefore insufficient evidence of success. The service accepts
 the command only when stdout parses to the expected JSON type and value.
 
+## Confirmed send command parsing
+
+Version 1.6.3 accepts `msg CONTACT MESSAGE` for direct messages and
+`chan INDEX MESSAGE` for channel messages. A hexadecimal contact key prefix is
+resolved before a display name, which avoids ambiguous contact names. The CLI
+parses interactive commands with POSIX `shlex`, so user content must not be
+written until quoting, multiline rejection, size limits, result correlation,
+and error handling have deterministic tests.
+
 ## Still to verify
 
-Before adding message views and actions, capture:
+Before enabling message send actions, capture:
 
-- command names and JSON schemas for message history and events
-- exit codes for success, missing port, permission denial, timeout, and malformed
-  output
-- whether each command terminates or remains attached for events
-- behavior across disconnect and reconnect
+- direct and channel send result schemas
+- acknowledgment correlation and timeout behavior
+- payload length and Unicode behavior
+- permission denial and malformed-output behavior
 - compatibility with older supported CLI versions
