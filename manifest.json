@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "clartek.omamesh",
+  "name": "OmaMesh",
+  "version": "0.1.0",
+  "author": "Josh Clarke",
+  "license": "MIT",
+  "description": "MeshCore companions, nodes, and messages in the Omarchy bar.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "OmaMesh",
+    "description": "Connect to MeshCore companions over BLE, USB, or TCP/IP.",
+    "category": "Network",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "refreshIntervalSec": 10
+    },
+    "schema": [
+      {
+        "key": "refreshIntervalSec",
+        "type": "integer",
+        "label": "Refresh interval (seconds)",
+        "min": 2,
+        "max": 300,
+        "step": 1,
+        "defaultValue": 10
+      }
+    ]
+  }
+}
+
