@@ -7,8 +7,10 @@ official MeshCore mobile app.
 
 > [!IMPORTANT]
 > Omamesh is an early development preview. USB contacts, channels, incoming
-> message synchronization, and read-only conversations work. Sending, maps,
-> BLE, and TCP are not implemented yet.
+> message synchronization, conversations, coordinate overview, and
+> fixture-tested sending and management work. Sending, management, and TCP
+> still need live validation. Manual BLE is fixture-tested. BLE discovery and
+> geographic map tiles are not implemented.
 
 ## Current status
 
@@ -29,21 +31,27 @@ The current USB milestone has been tested with:
 | Configured channel browsing | Working |
 | Incoming direct and channel messages | Working preview |
 | Read-only conversations and unread state | Working preview |
-| Sending messages | Not implemented |
-| Network map | Placeholder |
-| BLE and TCP companions | Not implemented |
+| Direct and channel sending | Fixture-tested preview |
+| Add and remove channels | Fixture-tested preview |
+| Remove contacts | Fixture-tested preview |
+| Advertised-coordinate overview | Working preview |
+| Street map and map tiles | Not implemented |
+| TCP companion | Fixture-tested preview |
+| BLE companion by address or name | Fixture-tested preview |
+| BLE discovery | Not implemented |
 
 ## Requirements
 
 - Omarchy Quattro with the Quickshell-based shell
 - `meshcore-cli`
-- a MeshCore USB Serial Companion
-- permission to read and write the companion's `/dev/ttyACM*` or
+- a MeshCore USB Serial Companion, TCP companion endpoint, or configured BLE
+  companion address or name
+- for USB, permission to read and write the companion's `/dev/ttyACM*` or
   `/dev/ttyUSB*` device
 
 If `meshcore-cli` is missing, the plugin remains loaded and displays
-`meshcore-cli not found`; it does not attempt USB commands. Install the CLI and
-refresh the panel to retry.
+`meshcore-cli not found`; it does not attempt companion commands. Install the
+CLI and refresh the panel to retry.
 
 ## Install for development
 
@@ -56,9 +64,8 @@ omarchy plugin enable clartek.omamesh
 omarchy restart shell
 ```
 
-The widget defaults to the right side of the bar and `/dev/ttyACM0`. Use the
-Omarchy plugin settings when the companion is on a different supported serial
-device.
+The widget defaults to the right side of the bar, USB transport, and
+`/dev/ttyACM0`. Plugin settings can select TCP and configure its host and port.
 
 ## Controls
 
@@ -66,6 +73,14 @@ device.
 - Middle-click the bar icon to refresh.
 - Press `R` or `Enter` in the panel to refresh.
 - Press `/` on Contacts or Channels to focus search.
+- Open a Direct contact or channel to compose a message. Direct messages show
+  Delivered only after a matching acknowledgment. Channel messages show Sent
+  after the companion accepts them.
+- On Channels, use `+` to add a channel. Use the menu button on a channel to
+  open its settings. Removal requires a second confirmation and is disabled
+  for the public channel.
+- Use the menu button on a contact to view its details or remove it. Contact
+  removal also requires a second confirmation.
 - Press `H`/`L` or `1`/`2`/`3` to switch between Contacts, Channels, and Map.
 - Press `Tab`/`Shift+Tab` to switch Omarchy panels.
 - Press `Escape` to close the panel.
@@ -103,9 +118,9 @@ See [`docs/architecture.md`](docs/architecture.md) and
 3. Harden incoming synchronization, bounded local history, and unread state
 4. Polish read-only direct and channel conversations
 5. Add direct and channel sending with acknowledgment and failure states
-6. Channel and contact management
-7. Location-aware network map
-8. TCP and BLE companion transports through `meshcore-cli`
+6. Live-validate channel and contact management, then add import and sharing
+7. Add a native geographic map layer beneath the coordinate overview
+8. Live-validate TCP and manual BLE, then add BLE discovery
 9. Notifications, QR workflows, remote management, and parity polish
 
 ## Project layout

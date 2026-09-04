@@ -23,6 +23,32 @@ Quickshell `Process` must receive an argument array; no shell is involved:
 ["meshcore-cli", "-j", "-s", PORT, "get", "name"]
 ```
 
+TCP uses the same command and JSON contracts with a different connection
+argument prefix:
+
+```text
+["meshcore-cli", "-j", "-t", HOST, "-p", PORT, "get", "name"]
+```
+
+Hosts, ports, and transport selection are normalized before constructing the
+argument array. TCP lifecycle behavior is covered by the deterministic
+companion but still requires validation against a live TCP endpoint.
+
+Manual BLE selection uses:
+
+```text
+["meshcore-cli", "-j", "-a", TARGET, "get", "name"]
+```
+
+`-P` is appended only when the user enables OS pairing. Targets may be a BLE
+address, platform UUID, or MeshCore device-name fragment accepted by the CLI.
+Omamesh rejects empty targets, whitespace, controls, and punctuation outside
+the backend's supported address and name forms.
+
+CLI 1.6.3 device listing through `-l` is decorative text even when `-j` is
+present. It must not be fed into the structured event parser. Manual BLE
+lifecycle behavior is fixture-tested; live BLE and discovery remain pending.
+
 Relevant global options reported by 1.6.3 are:
 
 - `-v`: print the CLI version
@@ -49,10 +75,13 @@ normalized companion name.
 
 `contacts` exits after returning a JSON object keyed by a contact identifier.
 On a device with no discovered contacts, the result is `{}`. Contact records
-include fields such as `adv_name`, `type`, `public_key`, and `out_path_len`.
+include fields such as `adv_name`, `type`, `public_key`, `out_path_len`,
+`last_advert`, `adv_lat`, and `adv_lon`.
 Omamesh immediately maps these records to display-only objects and retains only
 a shortened identifier; it does not expose the object key or complete public
-key to the UI.
+key to the UI. Coordinates and timestamps are retained only after range and
+type validation. The firmware's default coordinate pair of zero, zero is
+treated as no advertised location.
 
 ```text
 ["meshcore-cli", "-j", "-s", PORT, "contacts"]
@@ -88,6 +117,14 @@ Incoming direct and channel records use `PRIV` and `CHAN` type values. Omamesh
 validates and bounds message history before exposing it to the UI. It never
 logs message bodies.
 
+Direct records identify the contact with a 6-byte public-key prefix. Some
+signed direct or room-forwarded records also contain a 4-byte `signature`
+prefix, which Omamesh resolves against normalized contacts when possible.
+Ordinary channel records do not carry a cryptographic sender identity. The
+official group-message convention puts `sender name: message` in plaintext.
+Omamesh separates that prefix for display but labels it unverified, since any
+holder of the channel key can choose the name.
+
 Advert, new-contact, and path-update events trigger a debounced snapshot rather
 than being trusted as complete contact records. A terminated persistent session
 enters an error state and reconnects after a bounded delay. This reconnect path
@@ -117,9 +154,17 @@ the command only when stdout parses to the expected JSON type and value.
 Version 1.6.3 accepts `msg CONTACT MESSAGE` for direct messages and
 `chan INDEX MESSAGE` for channel messages. A hexadecimal contact key prefix is
 resolved before a display name, which avoids ambiguous contact names. The CLI
-parses interactive commands with POSIX `shlex`, so user content must not be
-written until quoting, multiline rejection, size limits, result correlation,
-and error handling have deterministic tests.
+parses interactive commands with POSIX `shlex`. Omamesh single-quotes message
+arguments, escapes embedded quotes, rejects control characters and line breaks,
+and limits messages to 160 UTF-8 bytes.
+
+For channel sends, Omamesh prepends the local companion name and separator
+required by the group-message convention. The visible byte counter includes
+that prefix.
+
+The deterministic companion verifies direct acceptance followed by a matching
+acknowledgment, mismatched acknowledgment failure, and channel acceptance. Live
+radio validation is still required before sending is considered stable.
 
 ## Still to verify
 
@@ -130,3 +175,30 @@ Before enabling message send actions, capture:
 - payload length and Unicode behavior
 - permission denial and malformed-output behavior
 - compatibility with older supported CLI versions
+
+## Channel management
+
+Version 1.6.3 accepts `add_channel NAME [KEY]` and
+`remove_channel INDEX`. Names are limited by the backend to 32 UTF-8 bytes.
+Explicit keys are 16 bytes represented by exactly 32 hexadecimal characters.
+When no key is supplied, the backend deterministically derives one from the
+channel name.
+
+Successful channel mutations do not produce a reliable structured success
+document. Omamesh therefore requests a fresh `get_channels` snapshot and
+verifies that the named channel appeared or the indexed channel disappeared.
+The public channel at index zero cannot be removed. Add and remove paths are
+covered by the deterministic companion but still require live-device
+validation.
+
+## Contact management
+
+Version 1.6.3 accepts `remove_contact CONTACT` and resolves a hexadecimal key
+prefix before trying a display name. Omamesh uses the normalized 12-character
+key prefix so duplicate or changing display names cannot select the wrong
+contact.
+
+As with channels, removal success is not inferred from process status. A fresh
+`contacts` snapshot must prove that the key prefix disappeared. The
+deterministic companion covers this path, while live-device validation remains
+pending. Contact removal requires a second confirmation in the UI.

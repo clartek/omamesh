@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "clartek.omamesh",
   "name": "Omamesh",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "Josh Clarke",
   "license": "MIT",
   "description": "MeshCore companions, nodes, and messages in the Omarchy bar.",
@@ -19,16 +19,55 @@
     "allowMultiple": false,
     "defaultSection": "right",
     "defaults": {
+      "transport": "USB",
       "serialPort": "/dev/ttyACM0",
+      "tcpHost": "127.0.0.1",
+      "tcpPort": 5000,
+      "bleTarget": "",
+      "blePair": false,
       "refreshIntervalSec": 10,
       "commandTimeoutSec": 12
     },
     "schema": [
       {
+        "key": "transport",
+        "type": "enum",
+        "label": "Companion transport",
+        "options": ["USB", "TCP", "BLE"],
+        "defaultValue": "USB"
+      },
+      {
         "key": "serialPort",
         "type": "string",
         "label": "USB serial port",
         "defaultValue": "/dev/ttyACM0"
+      },
+      {
+        "key": "tcpHost",
+        "type": "string",
+        "label": "TCP companion host",
+        "defaultValue": "127.0.0.1"
+      },
+      {
+        "key": "tcpPort",
+        "type": "integer",
+        "label": "TCP companion port",
+        "min": 1,
+        "max": 65535,
+        "step": 1,
+        "defaultValue": 5000
+      },
+      {
+        "key": "bleTarget",
+        "type": "string",
+        "label": "BLE companion address or name",
+        "defaultValue": ""
+      },
+      {
+        "key": "blePair",
+        "type": "boolean",
+        "label": "Request OS pairing for BLE",
+        "defaultValue": false
       },
       {
         "key": "refreshIntervalSec",

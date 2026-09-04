@@ -22,6 +22,74 @@ if command -v quickshell >/dev/null 2>&1; then
     exit 1
   fi
   printf '%s\n' 'Persistent CLI smoke test passed.'
+  tcp_output="$(OMAMESH_TRANSPORT=TCP PATH="$project_dir/tests/bin:$PATH" timeout 20s quickshell -p "$project_dir/ServiceHarness.qml" --no-color 2>&1)" || {
+    printf '%s\n' "$tcp_output"
+    exit 1
+  }
+  if ! grep -q 'OMAMESH_SMOKE_LIVE:contacts=1:channels=1:messages=1:unread=1:transport=tcp' <<<"$tcp_output"; then
+    printf '%s\n' "$tcp_output"
+    exit 1
+  fi
+  printf '%s\n' 'TCP companion smoke test passed.'
+  ble_output="$(OMAMESH_TRANSPORT=BLE PATH="$project_dir/tests/bin:$PATH" timeout 20s quickshell -p "$project_dir/ServiceHarness.qml" --no-color 2>&1)" || {
+    printf '%s\n' "$ble_output"
+    exit 1
+  }
+  if ! grep -q 'OMAMESH_SMOKE_LIVE:contacts=1:channels=1:messages=1:unread=1:transport=ble' <<<"$ble_output"; then
+    printf '%s\n' "$ble_output"
+    exit 1
+  fi
+  printf '%s\n' 'BLE companion smoke test passed.'
+  send_output="$(OMAMESH_EXPECT_MESSAGE=1 OMAMESH_EXPECT_SEND=1 PATH="$project_dir/tests/bin:$PATH" timeout 20s quickshell -p "$project_dir/ServiceHarness.qml" --no-color 2>&1)" || {
+    printf '%s\n' "$send_output"
+    exit 1
+  }
+  if ! grep -q 'OMAMESH_SMOKE_SEND:kind=direct:state=delivered:messages=2' <<<"$send_output"; then
+    printf '%s\n' "$send_output"
+    exit 1
+  fi
+  channel_output="$(OMAMESH_EXPECT_MESSAGE=1 OMAMESH_EXPECT_SEND=1 OMAMESH_SEND_KIND=channel OMAMESH_SEND_STATE=sent PATH="$project_dir/tests/bin:$PATH" timeout 20s quickshell -p "$project_dir/ServiceHarness.qml" --no-color 2>&1)" || {
+    printf '%s\n' "$channel_output"
+    exit 1
+  }
+  if ! grep -q 'OMAMESH_SMOKE_SEND:kind=channel:state=sent:messages=2' <<<"$channel_output"; then
+    printf '%s\n' "$channel_output"
+    exit 1
+  fi
+  failure_output="$(OMAMESH_EXPECT_MESSAGE=1 OMAMESH_EXPECT_SEND=1 OMAMESH_FAKE_ACK=mismatch OMAMESH_SEND_STATE=failed PATH="$project_dir/tests/bin:$PATH" timeout 20s quickshell -p "$project_dir/ServiceHarness.qml" --no-color 2>&1)" || {
+    printf '%s\n' "$failure_output"
+    exit 1
+  }
+  if ! grep -q 'OMAMESH_SMOKE_SEND:kind=direct:state=failed:messages=2' <<<"$failure_output"; then
+    printf '%s\n' "$failure_output"
+    exit 1
+  fi
+  printf '%s\n' 'Message transaction smoke test passed.'
+  add_channel_output="$(OMAMESH_EXPECT_MANAGEMENT=add PATH="$project_dir/tests/bin:$PATH" timeout 20s quickshell -p "$project_dir/ServiceHarness.qml" --no-color 2>&1)" || {
+    printf '%s\n' "$add_channel_output"
+    exit 1
+  }
+  if ! grep -q 'OMAMESH_SMOKE_MANAGE:kind=add:state=succeeded:channels=2:nodes=1' <<<"$add_channel_output"; then
+    printf '%s\n' "$add_channel_output"
+    exit 1
+  fi
+  remove_channel_output="$(OMAMESH_EXPECT_MANAGEMENT=remove OMAMESH_FAKE_CHANNEL=1 PATH="$project_dir/tests/bin:$PATH" timeout 20s quickshell -p "$project_dir/ServiceHarness.qml" --no-color 2>&1)" || {
+    printf '%s\n' "$remove_channel_output"
+    exit 1
+  }
+  if ! grep -q 'OMAMESH_SMOKE_MANAGE:kind=remove:state=succeeded:channels=1:nodes=1' <<<"$remove_channel_output"; then
+    printf '%s\n' "$remove_channel_output"
+    exit 1
+  fi
+  remove_contact_output="$(OMAMESH_EXPECT_MANAGEMENT=remove-contact PATH="$project_dir/tests/bin:$PATH" timeout 20s quickshell -p "$project_dir/ServiceHarness.qml" --no-color 2>&1)" || {
+    printf '%s\n' "$remove_contact_output"
+    exit 1
+  }
+  if ! grep -q 'OMAMESH_SMOKE_MANAGE:kind=remove-contact:state=succeeded:channels=1:nodes=0' <<<"$remove_contact_output"; then
+    printf '%s\n' "$remove_contact_output"
+    exit 1
+  fi
+  printf '%s\n' 'Channel and contact management smoke tests passed.'
 fi
 
 if command -v meshcore-cli >/dev/null 2>&1; then

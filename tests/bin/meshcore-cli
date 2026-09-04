@@ -3,27 +3,65 @@ set -euo pipefail
 
 args=" $* "
 
+if [[ "${OMAMESH_TRANSPORT:-}" == "TCP" && "$args" != *" -v "* && "$args" != *" -t fixture.local -p 5001 "* ]]; then
+  exit 42
+fi
+
+if [[ -v OMAMESH_TRANSPORT && "$OMAMESH_TRANSPORT" == "BLE"
+      && "$args" != *" -v "* && "$args" != *" -a MeshCore-Fixture -P "* ]]; then
+  exit 43
+fi
+
 if [[ "$args" == *" -v "* ]]; then
   printf '%s\n' 'meshcore-cli fake-1.0'
 elif [[ "$args" == *" get name "* ]]; then
   printf '%s\n' '"Fixture Companion"'
 elif [[ "$args" == *" contacts "* && "$args" != *" -i "* ]]; then
-  printf '%s\n' '{"fixture":{"adv_name":"Fixture Friend","type":1,"public_key":"00112233445566778899aabbccddeeff","out_path_len":0}}'
+  printf '%s\n' '{"fixture":{"adv_name":"Fixture Friend","type":1,"public_key":"00112233445566778899aabbccddeeff","out_path_len":0,"last_advert":1788400000,"adv_lat":41.2565,"adv_lon":-95.9345}}'
 elif [[ "$args" == *" get_channels "* && "$args" != *" -i "* ]]; then
   printf '%s\n' '[{"channel_idx":0,"channel_name":"Public","channel_hash":"discard","channel_secret":"discard"}]'
 elif [[ "$args" == *" -i "* ]]; then
+  channel_added=0
+  contact_present=1
+  if [[ "${OMAMESH_FAKE_CHANNEL:-0}" == "1" ]]; then channel_added=1; fi
   while IFS= read -r line; do
     case "$line" in
       "echo __OMAMESH_READY__") printf '%s\n' '__OMAMESH_READY__' ;;
       "echo __OMAMESH_CONTACTS__") printf '%s\n' '__OMAMESH_CONTACTS__' ;;
-      contacts) printf '%s\n' '{"fixture":{"adv_name":"Fixture Friend","type":1,"public_key":"00112233445566778899aabbccddeeff","out_path_len":0}}' ;;
+      contacts)
+        if [[ "$contact_present" == "1" ]]; then
+          printf '%s\n' '{"fixture":{"adv_name":"Fixture Friend","type":1,"public_key":"00112233445566778899aabbccddeeff","out_path_len":0,"last_advert":1788400000,"adv_lat":41.2565,"adv_lon":-95.9345}}'
+        else
+          printf '%s\n' '{}'
+        fi
+        ;;
       "echo __OMAMESH_CHANNELS__") printf '%s\n' '__OMAMESH_CHANNELS__' ;;
-      get_channels) printf '%s\n' '[{"channel_idx":0,"channel_name":"Public","channel_hash":"discard","channel_secret":"discard"}]' ;;
+      get_channels)
+        if [[ "$channel_added" == "1" ]]; then
+          printf '%s\n' '[{"channel_idx":0,"channel_name":"Public","channel_hash":"discard","channel_secret":"discard"},{"channel_idx":1,"channel_name":"#fixture","channel_hash":"discard","channel_secret":"discard"}]'
+        else
+          printf '%s\n' '[{"channel_idx":0,"channel_name":"Public","channel_hash":"discard","channel_secret":"discard"}]'
+        fi
+        ;;
       "echo __OMAMESH_BATTERY__") printf '%s\n' '__OMAMESH_BATTERY__' ;;
       "get bat") printf '%s\n' '{"level":3650,"used_kb":1,"total_kb":10}' ;;
       "echo __OMAMESH_RADIO__") printf '%s\n' '__OMAMESH_RADIO__' ;;
       "get radio") printf '%s\n' '{"radio_freq":910.525,"radio_bw":62.5,"radio_sf":7,"radio_cr":5,"repeat":false}' ;;
       msgs_subscribe) printf '%s\n' '{"type":"PRIV","pubkey_prefix":"001122334455","sender_timestamp":1788400000,"text":"fixture message","path_len":0}' ;;
+      "echo __OMAMESH_SEND_START_"*"__"|"echo __OMAMESH_SEND_END_"*"__") printf '%s\n' "${line#echo }" ;;
+      msg\ *) printf '%s\n' '{"type":0,"expected_ack":"4802ed93","suggested_timeout":1000}' ;;
+      wait_ack)
+        if [[ "${OMAMESH_FAKE_ACK:-match}" == "mismatch" ]]; then
+          printf '%s\n' '{"code":"00000000"}'
+        else
+          printf '%s\n' '{"code":"4802ed93"}'
+        fi
+        ;;
+      chan\ *) printf '%s\n' '{}' ;;
+      "echo __OMAMESH_MANAGE_START_"*"__"|"echo __OMAMESH_MANAGE_END_"*"__") printf '%s\n' "${line#echo }" ;;
+      add_channel\ *) channel_added=1 ;;
+      "remove_channel 1") channel_added=0 ;;
+      "remove_contact 001122334455") contact_present=0 ;;
       quit) exit 0 ;;
     esac
   done
