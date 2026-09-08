@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "clartek.omamesh",
   "name": "Omamesh",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "author": "Josh Clarke",
   "license": "MIT",
   "description": "MeshCore companions, nodes, and messages in the Omarchy bar.",
@@ -25,10 +25,11 @@
       "tcpPort": 5000,
       "bleTarget": "",
       "blePair": false,
+      "enableNotifications": true,
       "refreshIntervalSec": 10,
       "commandTimeoutSec": 12,
       "enableMapTiles": true,
-      "mapTileProvider": "carto-dark"
+      "mapTileProvider": "dark"
     },
     "schema": [
       {
@@ -72,6 +73,12 @@
         "defaultValue": false
       },
       {
+        "key": "enableNotifications",
+        "type": "boolean",
+        "label": "Desktop notifications for messages",
+        "defaultValue": true
+      },
+      {
         "key": "refreshIntervalSec",
         "type": "integer",
         "label": "Refresh interval (seconds)",
@@ -99,8 +106,8 @@
         "key": "mapTileProvider",
         "type": "enum",
         "label": "Map tile provider",
-        "options": ["carto-dark", "carto-voyager", "osm"],
-        "defaultValue": "carto-dark"
+        "options": ["dark", "osm", "satellite"],
+        "defaultValue": "dark"
       }
     ]
   }

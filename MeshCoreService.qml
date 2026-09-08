@@ -56,6 +56,8 @@ Item {
   property bool requestingTelemetry: false
   property string telemetryState: "idle"
   property string telemetryError: ""
+  property string _eventStderr: ""
+  readonly property bool enableNotifications: settings && settings.enableNotifications !== undefined ? settings.enableNotifications : true
 
   readonly property int refreshIntervalSec: Model.clampRefreshInterval(
     settings && settings.refreshIntervalSec !== undefined ? settings.refreshIntervalSec : 10
@@ -178,6 +180,27 @@ Item {
       root.nodes = Model.incrementUnread(root.nodes, "keyPrefix", message.contactKeyPrefix)
     else
       root.channels = Model.incrementUnread(root.channels, "index", message.channelIndex)
+    root.notifyMessage(message)
+  }
+
+  function notifyMessage(message) {
+    if (!root.enableNotifications) return
+    var notif = Model.buildNotification(message)
+    if (!notif) return
+    notificationProcess.command = [
+      "/usr/bin/notify-send",
+      "-a", "Omamesh",
+      "-i", "network-wireless",
+      "--",
+      notif.summary,
+      notif.body
+    ]
+    notificationProcess.running = true
+  }
+
+  Process {
+    id: notificationProcess
+    command: []
   }
 
   function markConversationRead(conversationId) {
@@ -628,15 +651,32 @@ Item {
   Process {
     id: companionProbe
     command: []
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root._nameOutput = String(text || "")
+    stdout: SplitParser {
+      splitMarker: ""
+      onRead: function(chunk) {
+        if (root._nameOutput.length + chunk.length > 262144) {
+          companionProbe.signal(15)
+          companionProbeKillTimer.start()
+          root._nameOutput = ""
+          return
+        }
+        root._nameOutput += chunk
+      }
     }
-    stderr: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root._nameError = String(text || "")
+    stderr: SplitParser {
+      splitMarker: ""
+      onRead: function(chunk) {
+        if (root._nameError.length + chunk.length > 65536) {
+          companionProbe.signal(15)
+          companionProbeKillTimer.start()
+          root._nameError = ""
+          return
+        }
+        root._nameError += chunk
+      }
     }
     onExited: function(exitCode) {
+      companionProbeKillTimer.stop()
       commandTimeout.stop()
       if (root._timedOut) {
         root.disconnectState(Model.safeCliError("", true, root.transport))
@@ -656,19 +696,44 @@ Item {
     }
   }
 
+  Timer {
+    id: companionProbeKillTimer
+    interval: 1500
+    repeat: false
+    onTriggered: {
+      if (companionProbe.running) companionProbe.signal(9)
+    }
+  }
 
   Process {
     id: dataProbe
     command: []
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root._dataOutput = String(text || "")
+    stdout: SplitParser {
+      splitMarker: ""
+      onRead: function(chunk) {
+        if (root._dataOutput.length + chunk.length > 1048576) {
+          dataProbe.signal(15)
+          dataProbeKillTimer.start()
+          root._dataOutput = ""
+          return
+        }
+        root._dataOutput += chunk
+      }
     }
-    stderr: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root._dataError = String(text || "")
+    stderr: SplitParser {
+      splitMarker: ""
+      onRead: function(chunk) {
+        if (root._dataError.length + chunk.length > 65536) {
+          dataProbe.signal(15)
+          dataProbeKillTimer.start()
+          root._dataError = ""
+          return
+        }
+        root._dataError += chunk
+      }
     }
     onExited: function(exitCode) {
+      dataProbeKillTimer.stop()
       commandTimeout.stop()
       if (root._timedOut) {
         root._refreshPipeline = false
@@ -690,12 +755,32 @@ Item {
     }
   }
 
+  Timer {
+    id: dataProbeKillTimer
+    interval: 1500
+    repeat: false
+    onTriggered: {
+      if (dataProbe.running) dataProbe.signal(9)
+    }
+  }
+
   Process {
     id: eventSession
     command: []
     stdinEnabled: true
     stdout: SplitParser { onRead: function(line) { root.handleStreamLine(line) } }
-    stderr: StdioCollector { waitForEnd: true }
+    stderr: SplitParser {
+      splitMarker: ""
+      onRead: function(chunk) {
+        if (root._eventStderr.length + chunk.length > 65536) {
+          eventSession.signal(15)
+          eventSessionKillTimer.start()
+          root._eventStderr = ""
+          return
+        }
+        root._eventStderr += chunk
+      }
+    }
     onStarted: {
       write("set print_adverts on\n")
       write("set print_new_contacts on\n")
@@ -704,6 +789,7 @@ Item {
       write("echo __OMAMESH_READY__\n")
     }
     onExited: function(exitCode) {
+      eventSessionKillTimer.stop()
       sessionStartTimeout.stop()
       root._sessionReady = false
       root._snapshotPending = false
@@ -724,6 +810,15 @@ Item {
       root.connectionState = "error"
       root.lastError = root.transportText + " companion connection was lost"
       reconnectTimer.restart()
+    }
+  }
+
+  Timer {
+    id: eventSessionKillTimer
+    interval: 1500
+    repeat: false
+    onTriggered: {
+      if (eventSession.running) eventSession.signal(9)
     }
   }
 
@@ -836,10 +931,14 @@ Item {
     managementTimeout.stop()
     telemetryTimeout.stop()
     reconnectTimer.stop()
+    companionProbeKillTimer.stop()
+    dataProbeKillTimer.stop()
+    eventSessionKillTimer.stop()
     root._sessionStopping = true
     if (backendProbe.running) backendProbe.running = false
-    if (companionProbe.running) companionProbe.running = false
-    if (dataProbe.running) dataProbe.running = false
-    if (eventSession.running) eventSession.running = false
+    if (companionProbe.running) { companionProbe.signal(15); companionProbe.running = false }
+    if (dataProbe.running) { dataProbe.signal(15); dataProbe.running = false }
+    if (eventSession.running) { eventSession.signal(15); eventSession.running = false }
+    if (notificationProcess.running) notificationProcess.running = false
   }
 }

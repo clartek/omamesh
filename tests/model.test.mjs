@@ -145,18 +145,17 @@ assert.equal(model.filterContacts(contacts.items, "", 1).length, 0)
 assert.equal(model.filterContacts(contacts.items, "repeater", -1).length, 1)
 assert.equal(model.utf8ByteLength("hello"), 5)
 assert.equal(model.utf8ByteLength("rocket 🚀"), 11)
-assert.equal(model.sendByteLength("channel:0", "hello", "Radio"), 12)
+assert.equal(model.sendByteLength("channel:0", "hello", "Radio"), 5)
 let sendCommand = model.buildSendCommand("contact:001122334455", "it's ready")
 assert.equal(sendCommand.ok, true)
 assert.equal(sendCommand.kind, "direct")
 assert.equal(sendCommand.command, "msg 001122334455 'it'\"'\"'s ready'")
 sendCommand = model.buildSendCommand("channel:7", "hello #mesh", "ClarTek-Test")
-assert.equal(sendCommand.command, "chan 7 'ClarTek-Test: hello #mesh'")
+assert.equal(sendCommand.command, "chan 7 'hello #mesh'")
 assert.equal(model.buildSendCommand("contact:bad", "hello").ok, false)
 assert.equal(model.buildSendCommand("channel:256", "hello").ok, false)
 assert.equal(model.buildSendCommand("channel:0", "line\nbreak", "Radio").ok, false)
 assert.equal(model.buildSendCommand("channel:0", "🚀".repeat(41), "Radio").ok, false)
-assert.equal(model.buildSendCommand("channel:0", "hello", "").ok, false)
 let addChannel = model.buildAddChannelCommand("#omaha", "")
 assert.equal(addChannel.ok, true)
 assert.equal(addChannel.command, "add_channel '#omaha'")
@@ -258,9 +257,9 @@ assert.equal(Math.abs(multiBounds.centerLat - 41.25) < 0.01, true)
 assert.equal(Math.abs(multiBounds.centerLon - -95.95) < 0.01, true)
 assert.equal(multiBounds.zoom >= 3 && multiBounds.zoom <= 16, true)
 
-let tiles = model.calculateTileGrid(41.2565, -95.9345, 12, 400, 300, "carto-dark")
+let tiles = model.calculateTileGrid(41.2565, -95.9345, 12, 400, 300, "dark")
 assert.equal(tiles.length >= 4, true)
-assert.equal(tiles[0].url.indexOf("basemaps.cartocdn.com") !== -1, true)
+assert.equal(tiles[0].url.indexOf("arcgisonline.com") !== -1, true)
 
 let osmTiles = model.calculateTileGrid(41.2565, -95.9345, 12, 400, 300, "osm")
 assert.equal(osmTiles[0].url.indexOf("tile.openstreetmap.org") !== -1, true)
@@ -274,5 +273,28 @@ assert.equal(Math.round(projectedNodes[0].pixelX), 200)
 assert.equal(Math.round(projectedNodes[0].pixelY), 150)
 assert.equal(projectedNodes[0].inView, true)
 assert.equal(projectedNodes[1].inView, false)
+
+assert.equal(model.plain("<b>Hello & Welcome</b>", 20), "bHello  Welcome/b")
+assert.equal(model.plain("A".repeat(300), 50).length, 50)
+assert.equal(model.plain(null), "")
+
+let directNotif = model.buildNotification({
+  kind: "direct",
+  contactKeyPrefix: "12ab",
+  senderName: "Alice",
+  body: "Hello mesh!"
+})
+assert.equal(directNotif.summary, "Omamesh · Alice")
+assert.equal(directNotif.body, "Hello mesh!")
+
+let chanNotif = model.buildNotification({
+  kind: "channel",
+  channelIndex: 0,
+  channelName: "Public",
+  senderName: "Bob",
+  body: "<script>alert(1)</script>"
+})
+assert.equal(chanNotif.summary, "Omamesh · Bob (Public)")
+assert.equal(chanNotif.body, "scriptalert(1)/script")
 
 console.log("Model tests passed.")

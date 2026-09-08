@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.0 - 2026-09-08
+
+- Added official MeshCore vector icon to the bar widget and panel header.
+- Added desktop notifications for incoming direct and channel messages.
+- Hardened for Omarchy marketplace security review (all text pinned to PlainText, bounded stream parsing, process kill escalation).
+- Added watermark-free Esri World Dark Gray Canvas basemap with pan/zoom and node markers.
+- Refined channel messaging to send pure message text without sender name prefixing.
+- Added marketplace preview asset and safe removal documentation.
+
 ## 0.2.0 - 2026-09-03
 
 - Added persistent USB event synchronization and reconnect handling.

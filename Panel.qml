@@ -130,6 +130,13 @@ Panel {
     root.newChannelSecret = ""
     meshcore.resetManagementStatus()
   }
+  function openConnectionDetails() {
+    root.conversationId = ""
+    root.detailNode = null
+    root.managedChannel = null
+    root.managementView = "connection"
+    root.confirmRemoval = false
+  }
   function openChannelManagement(item) {
     root.conversationId = ""
     root.detailNode = null
@@ -237,10 +244,14 @@ Panel {
             width: Style.space(38); height: width; radius: width / 2
             color: Style.hoverFillFor(root.foreground, Color.accent)
             anchors.verticalCenter: parent.verticalCenter
-            Text { anchors.centerIn: parent; text: "󰛳"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.iconLarge }
+            MeshCoreIcon {
+              anchors.centerIn: parent
+              iconSize: Style.space(20)
+              color: root.foreground
+            }
           }
           Column {
-            width: parent.width - refreshButton.width - Style.space(58)
+            width: parent.width - refreshButton.width - connectionButton.width - Style.space(68)
             anchors.verticalCenter: parent.verticalCenter; spacing: Style.space(2)
             Text { width: parent.width; textFormat: Text.PlainText; text: meshcore.companion ? meshcore.companion.name : "Omamesh"; color: root.foreground; elide: Text.ElideRight; font.family: root.fontFamily; font.pixelSize: Style.font.title; font.bold: true }
             Text {
@@ -253,10 +264,28 @@ Panel {
             }
           }
           Rectangle {
+            id: connectionButton
+            width: Style.space(34); height: width; radius: Style.cornerRadius
+            color: root.managementView === "connection" || connectionArea.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
+            Text {
+              textFormat: Text.PlainText
+              anchors.centerIn: parent; text: "󰒋"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.icon
+            }
+            MouseArea {
+              id: connectionArea
+              anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+              onClicked: {
+                if (root.managementView === "connection") root.leaveSubview()
+                else root.openConnectionDetails()
+              }
+            }
+          }
+          Rectangle {
             id: refreshButton
             width: Style.space(34); height: width; radius: Style.cornerRadius
             color: refreshArea.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
             Text {
+              textFormat: Text.PlainText
               anchors.centerIn: parent; text: "󰑐"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.icon
               RotationAnimator on rotation { running: meshcore.busy; from: 0; to: 360; duration: 850; loops: Animation.Infinite }
             }
@@ -298,8 +327,8 @@ Panel {
             Row {
               anchors.centerIn: parent
               spacing: Style.space(5)
-              Text { text: "󰈲"; color: root.contactTypeFilter === -1 ? root.dim : Color.accent; font.family: root.fontFamily; font.pixelSize: Style.font.icon }
-              Text { text: root.contactFilterLabel(); color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
+              Text { textFormat: Text.PlainText; text: "󰈲"; color: root.contactTypeFilter === -1 ? root.dim : Color.accent; font.family: root.fontFamily; font.pixelSize: Style.font.icon }
+              Text { textFormat: Text.PlainText; text: root.contactFilterLabel(); color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
             }
             MouseArea {
               id: contactFilterMouse
@@ -319,7 +348,7 @@ Panel {
             color: addChannelMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
             border.width: 1
             border.color: Style.hoverFillFor(root.foreground, Color.accent)
-            Text { anchors.centerIn: parent; text: "+"; color: Color.accent; font.family: root.fontFamily; font.pixelSize: Style.font.title; font.bold: true }
+            Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: "+"; color: Color.accent; font.family: root.fontFamily; font.pixelSize: Style.font.title; font.bold: true }
             MouseArea {
               id: addChannelMouse
               anchors.fill: parent
@@ -335,9 +364,9 @@ Panel {
           height: parent.height - Style.space(searchField.visible ? 156 : 116)
           Column {
             anchors.centerIn: parent; width: parent.width; visible: meshcore.connectionState !== "connected"; spacing: Style.space(8)
-            Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; text: "󰛳"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.space(40) }
-            Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; text: meshcore.statusText; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.title; font.bold: true }
-            Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; text: meshcore.lastError || "Connect a USB Serial Companion to begin."; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.body }
+            Text { textFormat: Text.PlainText; width: parent.width; horizontalAlignment: Text.AlignHCenter; text: "󰛳"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.space(40) }
+            Text { textFormat: Text.PlainText; width: parent.width; horizontalAlignment: Text.AlignHCenter; text: meshcore.statusText; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.title; font.bold: true }
+            Text { textFormat: Text.PlainText; width: parent.width; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; text: meshcore.lastError || "Connect a USB Serial Companion to begin."; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.body }
           }
 
           ListView {
@@ -352,7 +381,7 @@ Panel {
               Row {
                 anchors.fill: parent; anchors.margins: Style.space(8); spacing: Style.space(11)
                 Rectangle { width: Style.space(42); height: width; radius: width / 2; color: Color.accent; anchors.verticalCenter: parent.verticalCenter
-                  Text { anchors.centerIn: parent; text: modelData.icon; color: Color.background; font.family: root.fontFamily; font.pixelSize: Style.font.iconLarge }
+                  Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: modelData.icon; color: Color.background; font.family: root.fontFamily; font.pixelSize: Style.font.iconLarge }
                 }
                 Column { width: parent.width - Style.space(118); anchors.verticalCenter: parent.verticalCenter; spacing: Style.space(3)
                   Text { width: parent.width; text: modelData.name; textFormat: Text.PlainText; elide: Text.ElideRight; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
@@ -362,7 +391,7 @@ Panel {
                   visible: Number(modelData.unreadCount) > 0
                   width: Style.space(27); height: width; radius: width / 2
                   color: root.urgent; anchors.verticalCenter: parent.verticalCenter
-                  Text { anchors.centerIn: parent; text: Math.min(99, Number(modelData.unreadCount)); color: Color.background; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.bold: true }
+                  Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: Math.min(99, Number(modelData.unreadCount)); color: Color.background; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.bold: true }
                 }
               }
               MouseArea { id: rowMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.openNode(modelData) }
@@ -375,7 +404,7 @@ Panel {
                 radius: Style.cornerRadius
                 z: 2
                 color: contactManageMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
-                Text { anchors.centerIn: parent; text: "󰇙"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.icon }
+                Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: "󰇙"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.icon }
                 MouseArea {
                   id: contactManageMouse
                   anchors.fill: parent
@@ -391,7 +420,7 @@ Panel {
             id: channelList
             anchors.fill: parent; visible: meshcore.connectionState === "connected" && !root.hasSubview && root.selectedTab === 1
             clip: true; model: root.filteredChannels; spacing: Style.space(3)
-            header: Text { width: channelList.width; height: Style.space(32); text: meshcore.channels.length === 0 ? "No configured channels" : (root.filteredChannels.length === 0 ? "NO MATCHING CHANNELS" : "CHANNELS"); color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; font.letterSpacing: 1 }
+            header: Text { textFormat: Text.PlainText; width: channelList.width; height: Style.space(32); text: meshcore.channels.length === 0 ? "No configured channels" : (root.filteredChannels.length === 0 ? "NO MATCHING CHANNELS" : "CHANNELS"); color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; font.letterSpacing: 1 }
             delegate: Rectangle {
               required property var modelData
               width: channelList.width; height: Style.space(64); radius: Style.cornerRadius
@@ -399,7 +428,7 @@ Panel {
               Row {
                 anchors.fill: parent; anchors.margins: Style.space(8); spacing: Style.space(11)
                 Rectangle { width: Style.space(42); height: width; radius: width / 2; color: Color.accent; anchors.verticalCenter: parent.verticalCenter
-                  Text { anchors.centerIn: parent; text: "󰒍"; color: Color.background; font.family: root.fontFamily; font.pixelSize: Style.font.iconLarge }
+                  Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: "󰒍"; color: Color.background; font.family: root.fontFamily; font.pixelSize: Style.font.iconLarge }
                 }
                 Column { width: parent.width - Style.space(118); anchors.verticalCenter: parent.verticalCenter; spacing: Style.space(3)
                   Text { width: parent.width; text: modelData.name; textFormat: Text.PlainText; elide: Text.ElideRight; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
@@ -409,7 +438,7 @@ Panel {
                   visible: Number(modelData.unreadCount) > 0
                   width: Style.space(27); height: width; radius: width / 2
                   color: root.urgent; anchors.verticalCenter: parent.verticalCenter
-                  Text { anchors.centerIn: parent; text: Math.min(99, Number(modelData.unreadCount)); color: Color.background; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.bold: true }
+                  Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: Math.min(99, Number(modelData.unreadCount)); color: Color.background; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.bold: true }
                 }
               }
               MouseArea { id: channelMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.openConversation("channel:" + modelData.index, modelData.name) }
@@ -422,7 +451,7 @@ Panel {
                 radius: Style.cornerRadius
                 z: 2
                 color: channelManageMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
-                Text { anchors.centerIn: parent; text: "󰇙"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.icon }
+                Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: "󰇙"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.icon }
                 MouseArea {
                   id: channelManageMouse
                   anchors.fill: parent
@@ -444,19 +473,20 @@ Panel {
               Rectangle {
                 width: Style.space(34); height: width; radius: Style.cornerRadius
                 color: backMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
-                Text { anchors.centerIn: parent; text: "󰁍"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.icon }
+                Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: "󰁍"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.icon }
                 MouseArea { id: backMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.leaveSubview() }
               }
               Column {
                 width: parent.width - Style.space(42); anchors.verticalCenter: parent.verticalCenter
                 Text { width: parent.width; text: root.conversationTitle; textFormat: Text.PlainText; elide: Text.ElideRight; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
-                Text { width: parent.width; text: root.conversationId.indexOf("channel:") === 0 ? "Channel messages" : "Direct messages"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
+                Text { textFormat: Text.PlainText; width: parent.width; text: root.conversationId.indexOf("channel:") === 0 ? "Channel messages" : "Direct messages"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
               }
             }
 
             Item {
               width: parent.width; height: parent.height - Style.space(122)
               Text {
+                textFormat: Text.PlainText
                 anchors.centerIn: parent; visible: root.conversationMessages.length === 0
                 text: "No messages yet"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.body
               }
@@ -487,8 +517,7 @@ Panel {
                         id: senderText
                         width: parent.width
                         visible: modelData.incoming && String(modelData.senderName || "") !== ""
-                        text: (modelData.senderName || "")
-                          + (modelData.senderVerified === false ? "  ·  unverified" : "")
+                        text: modelData.senderName || ""
                         textFormat: Text.PlainText
                         elide: Text.ElideRight
                         color: Color.accent
@@ -506,6 +535,7 @@ Panel {
                     }
                   }
                   Text {
+                    textFormat: Text.PlainText
                     id: messageTime
                     anchors.top: messageBubble.bottom
                     anchors.left: modelData.incoming ? parent.left : undefined
@@ -548,6 +578,7 @@ Panel {
                     ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
                   opacity: messageInput.enabled && root.draftMessage.trim() !== "" ? 1 : 0.45
                   Text {
+                    textFormat: Text.PlainText
                     anchors.centerIn: parent
                     text: meshcore.sending ? "󰔟" : "󰒊"
                     color: Color.accent
@@ -576,9 +607,114 @@ Panel {
                   font.pixelSize: Style.font.caption
                 }
                 Text {
+                  textFormat: Text.PlainText
                   id: byteCount
                   text: Model.sendByteLength(root.conversationId, root.draftMessage, meshcore.companion ? meshcore.companion.name : "") + "/160"
                   color: Model.sendByteLength(root.conversationId, root.draftMessage, meshcore.companion ? meshcore.companion.name : "") > 160 ? root.urgent : root.dim
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                }
+              }
+            }
+          }
+
+          Column {
+            anchors.fill: parent
+            visible: root.managementView === "connection"
+            spacing: Style.space(12)
+
+            Row {
+              width: parent.width; height: Style.space(38); spacing: Style.space(8)
+              Rectangle {
+                width: Style.space(34); height: width; radius: Style.cornerRadius
+                color: connBackMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
+                Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: "󰁍"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.icon }
+                MouseArea { id: connBackMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.leaveSubview() }
+              }
+              Text { textFormat: Text.PlainText; width: parent.width - Style.space(42); anchors.verticalCenter: parent.verticalCenter; text: "Connection & Transport"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
+            }
+
+            Rectangle {
+              width: parent.width
+              height: Style.space(92)
+              radius: Style.cornerRadius
+              color: Style.hoverFillFor(root.foreground, Color.accent)
+              Column {
+                anchors.fill: parent
+                anchors.margins: Style.space(12)
+                spacing: Style.space(4)
+                Row {
+                  width: parent.width; spacing: Style.space(8)
+                  Text { textFormat: Text.PlainText; text: "Active Transport:"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
+                  Text { textFormat: Text.PlainText; text: meshcore.transportText; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; font.bold: true }
+                  Rectangle {
+                    width: Style.space(8); height: width; radius: width / 2
+                    anchors.verticalCenter: parent.verticalCenter
+                    color: meshcore.connectionState === "connected" ? Color.accent : (meshcore.connectionState === "error" ? root.urgent : root.dim)
+                  }
+                  Text { textFormat: Text.PlainText; text: meshcore.statusText; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
+                }
+                Row {
+                  width: parent.width; spacing: Style.space(8)
+                  Text { textFormat: Text.PlainText; text: "Endpoint:"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
+                  Text {
+                    textFormat: Text.PlainText
+                    text: meshcore.transport === "tcp"
+                      ? (meshcore.tcpHost + ":" + meshcore.tcpPort)
+                      : (meshcore.transport === "ble"
+                          ? (meshcore.bleTarget || "Not configured")
+                          : meshcore.serialPort)
+                    color: root.foreground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.bodySmall
+                  }
+                }
+                Row {
+                  width: parent.width; spacing: Style.space(8)
+                  Text { textFormat: Text.PlainText; text: "Companion:"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
+                  Text { textFormat: Text.PlainText; text: meshcore.companion ? meshcore.companion.name : "None"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
+                }
+              }
+            }
+
+            Rectangle {
+              width: parent.width
+              height: Style.space(72)
+              radius: Style.cornerRadius
+              color: Style.hoverFillFor(root.foreground, Color.accent)
+              Column {
+                anchors.fill: parent
+                anchors.margins: Style.space(12)
+                spacing: Style.space(4)
+                Row {
+                  width: parent.width; spacing: Style.space(8)
+                  Text { textFormat: Text.PlainText; text: "Radio:"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
+                  Text { textFormat: Text.PlainText; text: meshcore.radioText || "Awaiting radio status"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
+                }
+                Row {
+                  width: parent.width; spacing: Style.space(8)
+                  Text { textFormat: Text.PlainText; text: "Battery:"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
+                  Text { textFormat: Text.PlainText; text: meshcore.batteryText || "Unknown"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
+                }
+              }
+            }
+
+            Rectangle {
+              width: parent.width
+              height: Style.space(90)
+              radius: Style.cornerRadius
+              color: Style.hoverFillFor(root.foreground, Color.accent)
+              Column {
+                anchors.fill: parent
+                anchors.margins: Style.space(12)
+                spacing: Style.space(4)
+                Text { textFormat: Text.PlainText; text: "Configure Transports"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
+                Text {
+                  textFormat: Text.PlainText
+                  width: parent.width
+                  wrapMode: Text.WordWrap
+                  text: "Transport mode (USB Serial, TCP companion, or BLE) and endpoints can be customized in the Omarchy Bar Widget settings dialog."
+                  color: root.dim
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.caption
                 }
@@ -596,13 +732,14 @@ Panel {
               Rectangle {
                 width: Style.space(34); height: width; radius: Style.cornerRadius
                 color: addBackMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
-                Text { anchors.centerIn: parent; text: "󰁍"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.icon }
+                Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: "󰁍"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.icon }
                 MouseArea { id: addBackMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.leaveSubview() }
               }
-              Text { width: parent.width - Style.space(42); anchors.verticalCenter: parent.verticalCenter; text: "Add channel"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
+              Text { textFormat: Text.PlainText; width: parent.width - Style.space(42); anchors.verticalCenter: parent.verticalCenter; text: "Add channel"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
             }
 
             Text {
+              textFormat: Text.PlainText
               width: parent.width
               wrapMode: Text.WordWrap
               text: "Create a channel in the next free companion slot. Names and keys are sent only to meshcore-cli and are not logged."
@@ -610,7 +747,7 @@ Panel {
               font.family: root.fontFamily
               font.pixelSize: Style.font.bodySmall
             }
-            Text { text: "CHANNEL NAME"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
+            Text { textFormat: Text.PlainText; text: "CHANNEL NAME"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
             TextField {
               id: channelNameInput
               width: parent.width
@@ -622,7 +759,7 @@ Panel {
               enabled: !meshcore.managing
               onTextChanged: root.newChannelName = text
             }
-            Text { text: "OPTIONAL 16-BYTE KEY"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
+            Text { textFormat: Text.PlainText; text: "OPTIONAL 16-BYTE KEY"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
             TextField {
               width: parent.width
               placeholderText: "32 hexadecimal characters"
@@ -636,6 +773,7 @@ Panel {
               onAccepted: root.createChannel()
             }
             Text {
+              textFormat: Text.PlainText
               width: parent.width
               wrapMode: Text.WordWrap
               text: root.newChannelSecret.trim() === ""
@@ -664,6 +802,7 @@ Panel {
               border.color: Color.accent
               opacity: root.newChannelName.trim() !== "" && !meshcore.managing ? 1 : 0.45
               Text {
+                textFormat: Text.PlainText
                 anchors.centerIn: parent
                 text: meshcore.managing ? "Applying…" : "Add channel"
                 color: Color.accent
@@ -692,10 +831,10 @@ Panel {
               Rectangle {
                 width: Style.space(34); height: width; radius: Style.cornerRadius
                 color: channelBackMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
-                Text { anchors.centerIn: parent; text: "󰁍"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.icon }
+                Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: "󰁍"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.icon }
                 MouseArea { id: channelBackMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.leaveSubview() }
               }
-              Text { width: parent.width - Style.space(42); anchors.verticalCenter: parent.verticalCenter; text: "Channel settings"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
+              Text { textFormat: Text.PlainText; width: parent.width - Style.space(42); anchors.verticalCenter: parent.verticalCenter; text: "Channel settings"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
             }
 
             Rectangle {
@@ -708,17 +847,18 @@ Panel {
                 Rectangle {
                   width: Style.space(46); height: width; radius: width / 2; color: Color.accent
                   anchors.verticalCenter: parent.verticalCenter
-                  Text { anchors.centerIn: parent; text: "󰒍"; color: Color.background; font.family: root.fontFamily; font.pixelSize: Style.font.iconLarge }
+                  Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: "󰒍"; color: Color.background; font.family: root.fontFamily; font.pixelSize: Style.font.iconLarge }
                 }
                 Column {
                   width: parent.width - Style.space(58); anchors.verticalCenter: parent.verticalCenter; spacing: Style.space(4)
                   Text { width: parent.width; text: root.managedChannel ? root.managedChannel.name : ""; textFormat: Text.PlainText; elide: Text.ElideRight; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.title; font.bold: true }
-                  Text { width: parent.width; text: root.managedChannel ? root.managedChannel.kind + "  ·  Slot " + root.managedChannel.index : ""; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
+                  Text { textFormat: Text.PlainText; width: parent.width; text: root.managedChannel ? root.managedChannel.kind + "  ·  Slot " + root.managedChannel.index : ""; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
                 }
               }
             }
 
             Text {
+              textFormat: Text.PlainText
               width: parent.width
               wrapMode: Text.WordWrap
               text: root.managedChannel && Number(root.managedChannel.index) === 0
@@ -750,6 +890,7 @@ Panel {
               border.color: root.urgent
               opacity: meshcore.managing ? 0.45 : 1
               Text {
+                textFormat: Text.PlainText
                 anchors.centerIn: parent
                 text: meshcore.managing ? "Removing…" : (root.confirmRemoval ? "Confirm removal" : "Remove channel")
                 color: root.urgent
@@ -778,10 +919,10 @@ Panel {
               Rectangle {
                 width: Style.space(34); height: width; radius: Style.cornerRadius
                 color: detailBackMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
-                Text { anchors.centerIn: parent; text: "󰁍"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.icon }
+                Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: "󰁍"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.icon }
                 MouseArea { id: detailBackMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.leaveSubview() }
               }
-              Text { width: parent.width - Style.space(42); anchors.verticalCenter: parent.verticalCenter; text: "Contact details"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
+              Text { textFormat: Text.PlainText; width: parent.width - Style.space(42); anchors.verticalCenter: parent.verticalCenter; text: "Contact details"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
             }
 
             Flickable {
@@ -806,11 +947,11 @@ Panel {
                     anchors.left: parent.left; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                     anchors.margins: Style.space(14); spacing: Style.space(12)
                     Rectangle { width: Style.space(48); height: width; radius: width / 2; color: Color.accent
-                      Text { anchors.centerIn: parent; text: root.detailNode ? root.detailNode.icon : ""; color: Color.background; font.family: root.fontFamily; font.pixelSize: Style.font.iconLarge }
+                      Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: root.detailNode ? root.detailNode.icon : ""; color: Color.background; font.family: root.fontFamily; font.pixelSize: Style.font.iconLarge }
                     }
                     Column { width: parent.width - Style.space(60); anchors.verticalCenter: parent.verticalCenter; spacing: Style.space(4)
                       Text { width: parent.width; text: root.detailNode ? root.detailNode.name : ""; textFormat: Text.PlainText; elide: Text.ElideRight; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.title; font.bold: true }
-                      Text { width: parent.width; text: root.detailNode ? root.detailNode.typeLabel : ""; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
+                      Text { textFormat: Text.PlainText; width: parent.width; text: root.detailNode ? root.detailNode.typeLabel : ""; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
                     }
                   }
                 }
@@ -823,8 +964,8 @@ Panel {
                   border.color: Color.accent
                   Row {
                     anchors.centerIn: parent; spacing: Style.space(6)
-                    Text { text: "󰍡"; color: Color.accent; font.family: root.fontFamily; font.pixelSize: Style.font.icon }
-                    Text { text: "Send direct message"; color: Color.accent; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
+                    Text { textFormat: Text.PlainText; text: "󰍡"; color: Color.accent; font.family: root.fontFamily; font.pixelSize: Style.font.icon }
+                    Text { textFormat: Text.PlainText; text: "Send direct message"; color: Color.accent; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
                   }
                   MouseArea {
                     id: messageContactMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
@@ -834,13 +975,13 @@ Panel {
 
                 Column {
                   width: parent.width; spacing: Style.space(8)
-                  Text { text: "IDENTIFIER"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
+                  Text { textFormat: Text.PlainText; text: "IDENTIFIER"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
                   Text { width: parent.width; text: root.detailNode ? root.detailNode.shortId : ""; textFormat: Text.PlainText; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body }
-                  Text { text: "ROUTE"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
+                  Text { textFormat: Text.PlainText; text: "ROUTE"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
                   Text { width: parent.width; text: root.detailNode ? root.detailNode.route : ""; textFormat: Text.PlainText; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body }
-                  Text { text: "LAST ADVERT"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
+                  Text { textFormat: Text.PlainText; text: "LAST ADVERT"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
                   Text { width: parent.width; text: root.detailNode ? Model.relativeTimeLabel(root.detailNode.lastAdvert) : ""; textFormat: Text.PlainText; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body }
-                  Text { text: "ADVERTISED LOCATION"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
+                  Text { textFormat: Text.PlainText; text: "ADVERTISED LOCATION"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
                   Text { width: parent.width; text: root.detailNode ? Model.locationLabel(root.detailNode) : ""; textFormat: Text.PlainText; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body }
                 }
 
@@ -851,6 +992,7 @@ Panel {
                   Row {
                     width: parent.width; height: Style.space(26)
                     Text {
+                      textFormat: Text.PlainText
                       width: parent.width - telemReqBtn.width
                       anchors.verticalCenter: parent.verticalCenter
                       text: "TELEMETRY" + (meshcore.telemetryNodePrefix === (root.detailNode ? root.detailNode.keyPrefix : "") && meshcore.telemetryUpdatedAt > 0 ? "  ·  " + Model.relativeTimeLabel(meshcore.telemetryUpdatedAt) : "")
@@ -864,6 +1006,7 @@ Panel {
                       border.color: Style.hoverFillFor(root.foreground, Color.accent)
                       opacity: (meshcore.requestingTelemetry || meshcore.busy) ? 0.45 : 1
                       Text {
+                        textFormat: Text.PlainText
                         id: telemReqText
                         anchors.centerIn: parent
                         text: meshcore.requestingTelemetry ? "Requesting…" : "Request"
@@ -892,6 +1035,7 @@ Panel {
                   }
 
                   Text {
+                    textFormat: Text.PlainText
                     visible: meshcore.requestingTelemetry && meshcore.telemetryNodePrefix === (root.detailNode ? root.detailNode.keyPrefix : "")
                     width: parent.width
                     text: "Querying companion radio for telemetry data…"
@@ -936,6 +1080,7 @@ Panel {
                 }
 
                 Text {
+                  textFormat: Text.PlainText
                   width: parent.width
                   wrapMode: Text.WordWrap
                   text: root.confirmRemoval
@@ -968,6 +1113,7 @@ Panel {
                   border.color: root.urgent
                   opacity: meshcore.managing ? 0.45 : 1
                   Text {
+                    textFormat: Text.PlainText
                     anchors.centerIn: parent
                     text: meshcore.managing ? "Removing…" : (root.confirmRemoval ? "Confirm removal" : "Remove contact")
                     color: root.urgent
@@ -999,6 +1145,7 @@ Panel {
               spacing: Style.space(8)
 
               Text {
+                textFormat: Text.PlainText
                 width: parent.width - mapControlsRow.width - parent.spacing
                 anchors.verticalCenter: parent.verticalCenter
                 text: "NETWORK POSITIONS"
@@ -1014,6 +1161,7 @@ Panel {
                 spacing: Style.space(6)
 
                 Text {
+                  textFormat: Text.PlainText
                   anchors.verticalCenter: parent.verticalCenter
                   text: root.mapLocatedNodes.length + " LOCATED"
                   color: root.dim
@@ -1026,7 +1174,7 @@ Panel {
                   color: mapFitMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
                   border.width: 1
                   border.color: root.mapUserPanned ? Color.accent : Style.hoverFillFor(root.foreground, Color.accent)
-                  Text { anchors.centerIn: parent; text: "󰍉"; color: root.mapUserPanned ? Color.accent : root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
+                  Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: "󰍉"; color: root.mapUserPanned ? Color.accent : root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
                   MouseArea {
                     id: mapFitMouse
                     anchors.fill: parent
@@ -1041,7 +1189,7 @@ Panel {
                   color: mapModeMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
                   border.width: 1
                   border.color: root.mapTilesActive ? Color.accent : Style.hoverFillFor(root.foreground, Color.accent)
-                  Text { anchors.centerIn: parent; text: root.mapTilesActive ? "󰆋" : "󰙀"; color: root.mapTilesActive ? Color.accent : root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
+                  Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: root.mapTilesActive ? "󰆋" : "󰙀"; color: root.mapTilesActive ? Color.accent : root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
                   MouseArea {
                     id: mapModeMouse
                     anchors.fill: parent
@@ -1134,9 +1282,9 @@ Panel {
                 width: parent.width - Style.space(40)
                 visible: root.mapLocatedNodes.length === 0
                 spacing: Style.space(8)
-                Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; text: "󰆋"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.space(42) }
-                Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; text: "No advertised locations"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.title; font.bold: true }
-                Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; text: "Nodes appear here when their adverts include coordinates."; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.body }
+                Text { textFormat: Text.PlainText; width: parent.width; horizontalAlignment: Text.AlignHCenter; text: "󰆋"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.space(42) }
+                Text { textFormat: Text.PlainText; width: parent.width; horizontalAlignment: Text.AlignHCenter; text: "No advertised locations"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.title; font.bold: true }
+                Text { textFormat: Text.PlainText; width: parent.width; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; text: "Nodes appear here when their adverts include coordinates."; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.body }
               }
 
               Repeater {
@@ -1162,6 +1310,7 @@ Panel {
                     border.width: 2
                     border.color: root.foreground
                     Text {
+                      textFormat: Text.PlainText
                       anchors.centerIn: parent
                       text: modelData.icon || "󰒍"
                       color: Color.background
@@ -1215,7 +1364,7 @@ Panel {
                   color: zoomInMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : Qt.rgba(0, 0, 0, 0.65)
                   border.width: 1
                   border.color: Style.hoverFillFor(root.foreground, Color.accent)
-                  Text { anchors.centerIn: parent; text: "+"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
+                  Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: "+"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
                   MouseArea {
                     id: zoomInMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                     onClicked: root.zoomMap(1)
@@ -1227,7 +1376,7 @@ Panel {
                   color: zoomOutMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : Qt.rgba(0, 0, 0, 0.65)
                   border.width: 1
                   border.color: Style.hoverFillFor(root.foreground, Color.accent)
-                  Text { anchors.centerIn: parent; text: "-"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
+                  Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: "-"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
                   MouseArea {
                     id: zoomOutMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                     onClicked: root.zoomMap(-1)
@@ -1243,6 +1392,7 @@ Panel {
                 z: 25
 
                 Text {
+                  textFormat: Text.PlainText
                   width: parent.width - mapAttrText.implicitWidth
                   anchors.verticalCenter: parent.verticalCenter
                   text: Model.locationLabel({ hasLocation: true, latitude: root.mapCenterLat, longitude: root.mapCenterLon }) + "  ·  z" + root.mapZoom
@@ -1252,6 +1402,7 @@ Panel {
                 }
 
                 Text {
+                  textFormat: Text.PlainText
                   id: mapAttrText
                   anchors.verticalCenter: parent.verticalCenter
                   text: root.mapTilesActive ? (root.mapTileProvider === "osm" ? "OpenStreetMap" : "CartoDB") : "Offline Grid"
@@ -1274,8 +1425,8 @@ Panel {
               width: (parent.width - Style.space(8)) / 3; height: parent.height; radius: Style.cornerRadius
               color: root.selectedTab === index ? Style.hoverFillFor(root.foreground, Color.accent) : (tabMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent")
               Column { anchors.centerIn: parent; spacing: Style.space(2)
-                Text { anchors.horizontalCenter: parent.horizontalCenter; text: modelData.icon; color: root.selectedTab === index ? Color.accent : root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.icon }
-                Text { anchors.horizontalCenter: parent.horizontalCenter; text: modelData.label; color: root.selectedTab === index ? root.foreground : root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
+                Text { textFormat: Text.PlainText; anchors.horizontalCenter: parent.horizontalCenter; text: modelData.icon; color: root.selectedTab === index ? Color.accent : root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.icon }
+                Text { textFormat: Text.PlainText; anchors.horizontalCenter: parent.horizontalCenter; text: modelData.label; color: root.selectedTab === index ? root.foreground : root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
               }
               MouseArea { id: tabMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.selectTab(index) }
             }

@@ -54,17 +54,44 @@ BarWidget {
     function toggle(): void { root.togglePanel() }
   }
 
-  WidgetButton {
+  BarIconButton {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: root.unreadCount > 0 ? "󰛳 " + root.unreadCount : "󰛳"
-    active: root.unreadCount > 0
-    dimmed: root.connectionState !== "connected" && root.unreadCount === 0
     tooltipText: root.connectionState === "connected" ? "Omamesh connected" : "Omamesh disconnected"
-    labelVisible: true
-    horizontalMargin: 8.75
-    verticalPadding: 8.75
+    iconComponent: Component {
+      Item {
+        implicitWidth: iconRow.implicitWidth
+        implicitHeight: iconRow.implicitHeight
+
+        Row {
+          id: iconRow
+          anchors.centerIn: parent
+          spacing: Style.space(4)
+
+          MeshCoreIcon {
+            anchors.verticalCenter: parent.verticalCenter
+            iconSize: Math.round(Style.font.icon * 0.85)
+            color: root.unreadCount > 0
+              ? Color.accent
+              : (root.connectionState === "connected"
+                  ? (root.bar ? root.bar.barForeground : Color.foreground)
+                  : Qt.darker(root.bar ? root.bar.barForeground : Color.foreground, 1.55))
+          }
+
+          Text {
+            visible: root.unreadCount > 0
+            text: String(root.unreadCount)
+            textFormat: Text.PlainText
+            color: Color.accent
+            font.family: root.bar ? root.bar.fontFamily : Style.font.family
+            font.pixelSize: Style.font.bodySmall
+            font.bold: true
+            anchors.verticalCenter: parent.verticalCenter
+          }
+        }
+      }
+    }
     onPressed: function(mouseButton) {
       if (mouseButton === Qt.MiddleButton) root.refresh()
       else if (mouseButton === Qt.LeftButton) root.togglePanel()

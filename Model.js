@@ -518,8 +518,6 @@ function _cliQuote(value) {
 
 function sendByteLength(conversationId, body, senderName) {
   var text = String(body === undefined || body === null ? "" : body)
-  if (String(conversationId || "").indexOf("channel:") === 0)
-    text = String(senderName === undefined || senderName === null ? "" : senderName).trim() + ": " + text
   return utf8ByteLength(text)
 }
 
@@ -545,13 +543,7 @@ function buildSendCommand(conversationId, body, senderName) {
     var channelIndex = Number(indexText)
     if (!isFinite(channelIndex) || channelIndex < 0 || channelIndex > 255)
       return { ok: false, command: "", error: "The channel identifier is invalid" }
-    var sender = typeof senderName === "string" ? senderName.trim() : ""
-    if (sender === "" || /[\u0000-\u001f\u007f]/.test(sender) || utf8ByteLength(sender) > 32)
-      return { ok: false, command: "", error: "The companion name cannot identify this channel message" }
-    var channelText = sender + ": " + text
-    if (sendByteLength(id, text, sender) > 160)
-      return { ok: false, command: "", error: "The sender name and message are limited to 160 UTF-8 bytes" }
-    return { ok: true, kind: "channel", command: "chan " + Math.floor(channelIndex) + " " + _cliQuote(channelText), error: "" }
+    return { ok: true, kind: "channel", command: "chan " + Math.floor(channelIndex) + " " + _cliQuote(text), error: "" }
   }
   return { ok: false, command: "", error: "The conversation identifier is invalid" }
 }
@@ -831,14 +823,12 @@ function calculateMapBounds(items, width, height) {
 }
 
 function tileProviderUrl(provider, z, x, y) {
-  var subdomains = ["a", "b", "c", "d"]
-  var sub = subdomains[(x + y) % subdomains.length]
   var name = String(provider || "").toLowerCase()
   if (name === "osm")
     return "https://tile.openstreetmap.org/" + z + "/" + x + "/" + y + ".png"
-  if (name === "carto-voyager")
-    return "https://" + sub + ".basemaps.cartocdn.com/rastertiles/voyager/" + z + "/" + x + "/" + y + ".png"
-  return "https://" + sub + ".basemaps.cartocdn.com/dark_all/" + z + "/" + x + "/" + y + ".png"
+  if (name === "satellite")
+    return "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/" + z + "/" + y + "/" + x
+  return "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/" + z + "/" + y + "/" + x
 }
 
 function calculateTileGrid(centerLat, centerLon, zoom, viewportWidth, viewportHeight, provider) {
@@ -975,4 +965,31 @@ function totalUnread(channels, nodes) {
     if (isFinite(value) && value > 0) count += Math.floor(value)
   }
   return count
+}
+
+function plain(text, maxLen) {
+  var s = String(text === undefined || text === null ? "" : text)
+  s = s.replace(/[<>&]/g, "").replace(/[\u0000-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e]/g, " ").trim()
+  var limit = typeof maxLen === "number" && maxLen > 0 ? maxLen : 256
+  if (s.length > limit) s = s.slice(0, limit)
+  return s
+}
+
+function buildNotification(message) {
+  if (!message || typeof message !== "object") return null
+  var body = plain(message.body, 160)
+  if (body === "") return null
+  var summary = ""
+  if (message.kind === "direct") {
+    var sender = message.senderName || message.contactKeyPrefix || "MeshCore Contact"
+    summary = plain("Omamesh · " + sender, 64)
+  } else {
+    var chanName = message.channelName || ("Channel " + (message.channelIndex !== undefined ? message.channelIndex : ""))
+    if (message.senderName) {
+      summary = plain("Omamesh · " + message.senderName + " (" + chanName + ")", 64)
+    } else {
+      summary = plain("Omamesh · " + chanName, 64)
+    }
+  }
+  return { summary: summary, body: body }
 }
