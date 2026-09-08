@@ -8,9 +8,9 @@ official MeshCore mobile app.
 > [!IMPORTANT]
 > Omamesh is an early development preview. USB contacts, channels, incoming
 > message synchronization, conversations, coordinate overview, and
-> fixture-tested sending and management work. Sending, management, and TCP
-> still need live validation. Manual BLE is fixture-tested. BLE discovery and
-> geographic map tiles are not implemented.
+> fixture-tested sending, management, and telemetry work. Sending, management,
+> telemetry, and TCP still need live validation. Manual BLE is fixture-tested.
+> BLE discovery and geographic map tiles are not implemented.
 
 ## Current status
 
@@ -34,6 +34,7 @@ The current USB milestone has been tested with:
 | Direct and channel sending | Fixture-tested preview |
 | Add and remove channels | Fixture-tested preview |
 | Remove contacts | Fixture-tested preview |
+| Remote node telemetry | Fixture-tested preview |
 | Advertised-coordinate overview | Working preview |
 | Street map and map tiles | Not implemented |
 | TCP companion | Fixture-tested preview |
