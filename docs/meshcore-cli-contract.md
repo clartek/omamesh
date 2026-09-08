@@ -202,3 +202,31 @@ As with channels, removal success is not inferred from process status. A fresh
 `contacts` snapshot must prove that the key prefix disappeared. The
 deterministic companion covers this path, while live-device validation remains
 pending. Contact removal requires a second confirmation in the UI.
+
+## Node telemetry
+
+Version 1.6.3 accepts `req_telemetry CONTACT` (or alias `rt`). Omamesh uses the
+normalized 12-character hexadecimal key prefix to target the remote contact.
+
+In JSON mode (`-j`), the CLI returns an object with `name`, `pubkey_pre`, and
+an `lpp` array containing Cayenne LPP sensor records:
+
+```json
+{
+  "name": "Remote Node",
+  "pubkey_pre": "001122334455",
+  "lpp": [
+    { "channel": 1, "type": "temperature", "value": 21.5 },
+    { "channel": 2, "type": "voltage", "value": 4.12 }
+  ]
+}
+```
+
+If the contact is unknown or unreachable, the CLI outputs JSON error documents
+such as `{"error": "unknown contact"}` or `{"error": "Getting data"}`.
+Non-JSON stream lines such as `Error getting data` or `Unknown contact` are also
+detected. The response is validated and transformed into user-friendly labels,
+values, and units for sensors including temperature, humidity, barometer,
+voltage, current, power, energy, distance, illuminance, load, concentration,
+switches, GPS coordinates, and accelerometer axes. Telemetry requests run with
+a bounded timeout and mutual exclusion with concurrent companion commands.

@@ -90,6 +90,15 @@ if command -v quickshell >/dev/null 2>&1; then
     exit 1
   fi
   printf '%s\n' 'Channel and contact management smoke tests passed.'
+  telemetry_output="$(OMAMESH_EXPECT_TELEMETRY=1 PATH="$project_dir/tests/bin:$PATH" timeout 20s quickshell -p "$project_dir/ServiceHarness.qml" --no-color 2>&1)" || {
+    printf '%s\n' "$telemetry_output"
+    exit 1
+  }
+  if ! grep -q 'OMAMESH_SMOKE_TELEMETRY:state=succeeded:rows=2' <<<"$telemetry_output"; then
+    printf '%s\n' "$telemetry_output"
+    exit 1
+  fi
+  printf '%s\n' 'Node telemetry smoke test passed.'
 fi
 
 if command -v meshcore-cli >/dev/null 2>&1; then

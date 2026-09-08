@@ -710,7 +710,7 @@ Panel {
           Column {
             anchors.fill: parent
             visible: meshcore.connectionState === "connected" && root.detailNode !== null
-            spacing: Style.space(12)
+            spacing: Style.space(8)
 
             Row {
               width: parent.width; height: Style.space(38); spacing: Style.space(8)
@@ -723,80 +723,206 @@ Panel {
               Text { width: parent.width - Style.space(42); anchors.verticalCenter: parent.verticalCenter; text: "Contact details"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
             }
 
-            Rectangle {
-              width: parent.width; height: detailIdentity.implicitHeight + Style.space(28); radius: Style.cornerRadius
-              color: Style.hoverFillFor(root.foreground, Color.accent)
-              Row {
-                id: detailIdentity
-                anchors.left: parent.left; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
-                anchors.margins: Style.space(14); spacing: Style.space(12)
-                Rectangle { width: Style.space(48); height: width; radius: width / 2; color: Color.accent
-                  Text { anchors.centerIn: parent; text: root.detailNode ? root.detailNode.icon : ""; color: Color.background; font.family: root.fontFamily; font.pixelSize: Style.font.iconLarge }
-                }
-                Column { width: parent.width - Style.space(60); anchors.verticalCenter: parent.verticalCenter; spacing: Style.space(4)
-                  Text { width: parent.width; text: root.detailNode ? root.detailNode.name : ""; textFormat: Text.PlainText; elide: Text.ElideRight; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.title; font.bold: true }
-                  Text { width: parent.width; text: root.detailNode ? root.detailNode.typeLabel : ""; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
-                }
-              }
-            }
+            Flickable {
+              id: detailFlickable
+              width: parent.width
+              height: parent.height - Style.space(46)
+              contentWidth: width
+              contentHeight: detailContent.implicitHeight
+              clip: true
+              boundsBehavior: Flickable.StopAtBounds
 
-            Column {
-              width: parent.width; spacing: Style.space(8)
-              Text { text: "IDENTIFIER"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
-              Text { width: parent.width; text: root.detailNode ? root.detailNode.shortId : ""; textFormat: Text.PlainText; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body }
-              Text { text: "ROUTE"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
-              Text { width: parent.width; text: root.detailNode ? root.detailNode.route : ""; textFormat: Text.PlainText; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body }
-              Text { text: "LAST ADVERT"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
-              Text { width: parent.width; text: root.detailNode ? Model.relativeTimeLabel(root.detailNode.lastAdvert) : ""; textFormat: Text.PlainText; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body }
-              Text { text: "ADVERTISED LOCATION"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
-              Text { width: parent.width; text: root.detailNode ? Model.locationLabel(root.detailNode) : ""; textFormat: Text.PlainText; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body }
-            }
+              Column {
+                id: detailContent
+                width: parent.width
+                spacing: Style.space(12)
 
-            Text {
-              width: parent.width
-              wrapMode: Text.WordWrap
-              text: root.confirmRemoval
-                ? "Press Remove contact again to confirm. Existing in-memory messages remain until the plugin reloads."
-                : (root.detailNode && Number(root.detailNode.type) === 2
-                    ? "Repeater telemetry and remote management are planned for a later milestone."
-                    : "Telemetry and node actions are planned for a later milestone.")
-              color: root.confirmRemoval ? root.urgent : root.dim
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.bodySmall
-            }
-            Text {
-              width: parent.width
-              text: meshcore.managementError
-              textFormat: Text.PlainText
-              wrapMode: Text.WordWrap
-              color: root.urgent
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.bodySmall
-            }
-            Rectangle {
-              width: parent.width
-              height: Style.space(42)
-              radius: Style.cornerRadius
-              color: removeContactMouse.containsMouse || root.confirmRemoval
-                ? Style.hoverFillFor(root.foreground, root.urgent) : "transparent"
-              border.width: 1
-              border.color: root.urgent
-              opacity: meshcore.managing ? 0.45 : 1
-              Text {
-                anchors.centerIn: parent
-                text: meshcore.managing ? "Removing…" : (root.confirmRemoval ? "Confirm removal" : "Remove contact")
-                color: root.urgent
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.body
-                font.bold: true
-              }
-              MouseArea {
-                id: removeContactMouse
-                anchors.fill: parent
-                enabled: !meshcore.managing
-                hoverEnabled: true
-                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                onClicked: root.confirmContactRemoval()
+                Rectangle {
+                  width: parent.width; height: detailIdentity.implicitHeight + Style.space(28); radius: Style.cornerRadius
+                  color: Style.hoverFillFor(root.foreground, Color.accent)
+                  Row {
+                    id: detailIdentity
+                    anchors.left: parent.left; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+                    anchors.margins: Style.space(14); spacing: Style.space(12)
+                    Rectangle { width: Style.space(48); height: width; radius: width / 2; color: Color.accent
+                      Text { anchors.centerIn: parent; text: root.detailNode ? root.detailNode.icon : ""; color: Color.background; font.family: root.fontFamily; font.pixelSize: Style.font.iconLarge }
+                    }
+                    Column { width: parent.width - Style.space(60); anchors.verticalCenter: parent.verticalCenter; spacing: Style.space(4)
+                      Text { width: parent.width; text: root.detailNode ? root.detailNode.name : ""; textFormat: Text.PlainText; elide: Text.ElideRight; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.title; font.bold: true }
+                      Text { width: parent.width; text: root.detailNode ? root.detailNode.typeLabel : ""; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
+                    }
+                  }
+                }
+
+                Rectangle {
+                  visible: root.detailNode !== null && Number(root.detailNode.type) === 1
+                  width: parent.width; height: Style.space(38); radius: Style.cornerRadius
+                  color: messageContactMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
+                  border.width: 1
+                  border.color: Color.accent
+                  Row {
+                    anchors.centerIn: parent; spacing: Style.space(6)
+                    Text { text: "󰍡"; color: Color.accent; font.family: root.fontFamily; font.pixelSize: Style.font.icon }
+                    Text { text: "Send direct message"; color: Color.accent; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
+                  }
+                  MouseArea {
+                    id: messageContactMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                    onClicked: if (root.detailNode) root.openConversation("contact:" + root.detailNode.keyPrefix, root.detailNode.name)
+                  }
+                }
+
+                Column {
+                  width: parent.width; spacing: Style.space(8)
+                  Text { text: "IDENTIFIER"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
+                  Text { width: parent.width; text: root.detailNode ? root.detailNode.shortId : ""; textFormat: Text.PlainText; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body }
+                  Text { text: "ROUTE"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
+                  Text { width: parent.width; text: root.detailNode ? root.detailNode.route : ""; textFormat: Text.PlainText; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body }
+                  Text { text: "LAST ADVERT"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
+                  Text { width: parent.width; text: root.detailNode ? Model.relativeTimeLabel(root.detailNode.lastAdvert) : ""; textFormat: Text.PlainText; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body }
+                  Text { text: "ADVERTISED LOCATION"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
+                  Text { width: parent.width; text: root.detailNode ? Model.locationLabel(root.detailNode) : ""; textFormat: Text.PlainText; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body }
+                }
+
+                Column {
+                  width: parent.width
+                  spacing: Style.space(8)
+
+                  Row {
+                    width: parent.width; height: Style.space(26)
+                    Text {
+                      width: parent.width - telemReqBtn.width
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: "TELEMETRY" + (meshcore.telemetryNodePrefix === (root.detailNode ? root.detailNode.keyPrefix : "") && meshcore.telemetryUpdatedAt > 0 ? "  ·  " + Model.relativeTimeLabel(meshcore.telemetryUpdatedAt) : "")
+                      color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1
+                    }
+                    Rectangle {
+                      id: telemReqBtn
+                      width: telemReqText.implicitWidth + Style.space(16); height: Style.space(26); radius: Style.cornerRadius
+                      color: telemReqMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
+                      border.width: 1
+                      border.color: Style.hoverFillFor(root.foreground, Color.accent)
+                      opacity: (meshcore.requestingTelemetry || meshcore.busy) ? 0.45 : 1
+                      Text {
+                        id: telemReqText
+                        anchors.centerIn: parent
+                        text: meshcore.requestingTelemetry ? "Requesting…" : "Request"
+                        color: Color.accent; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.bold: true
+                      }
+                      MouseArea {
+                        id: telemReqMouse
+                        anchors.fill: parent
+                        enabled: !meshcore.requestingTelemetry && !meshcore.busy && root.detailNode !== null
+                        hoverEnabled: true
+                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                        onClicked: if (root.detailNode) meshcore.requestTelemetry(root.detailNode.keyPrefix)
+                      }
+                    }
+                  }
+
+                  Text {
+                    visible: meshcore.telemetryNodePrefix === (root.detailNode ? root.detailNode.keyPrefix : "") && meshcore.telemetryState === "failed"
+                    width: parent.width
+                    text: meshcore.telemetryError || "The node did not return telemetry"
+                    textFormat: Text.PlainText
+                    wrapMode: Text.WordWrap
+                    color: root.urgent
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.bodySmall
+                  }
+
+                  Text {
+                    visible: meshcore.requestingTelemetry && meshcore.telemetryNodePrefix === (root.detailNode ? root.detailNode.keyPrefix : "")
+                    width: parent.width
+                    text: "Querying companion radio for telemetry data…"
+                    color: root.dim
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.bodySmall
+                  }
+
+                  Repeater {
+                    model: (meshcore.telemetryNodePrefix === (root.detailNode ? root.detailNode.keyPrefix : "") && meshcore.telemetryState === "succeeded")
+                      ? meshcore.telemetryRows : []
+                    delegate: Rectangle {
+                      required property var modelData
+                      width: detailContent.width
+                      height: Style.space(34)
+                      radius: Style.cornerRadius
+                      color: Style.hoverFillFor(root.foreground, Color.accent)
+                      Text {
+                        anchors.left: parent.left
+                        anchors.leftMargin: Style.space(10)
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: modelData.label + (Number(modelData.channel) > 0 ? " (Ch " + modelData.channel + ")" : "")
+                        textFormat: Text.PlainText
+                        color: root.foreground
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.bodySmall
+                        font.bold: true
+                      }
+                      Text {
+                        anchors.right: parent.right
+                        anchors.rightMargin: Style.space(10)
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: modelData.value
+                        textFormat: Text.PlainText
+                        color: Color.accent
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.bodySmall
+                        font.bold: true
+                      }
+                    }
+                  }
+                }
+
+                Text {
+                  width: parent.width
+                  wrapMode: Text.WordWrap
+                  text: root.confirmRemoval
+                    ? "Press Remove contact again to confirm. Existing in-memory messages remain until the plugin reloads."
+                    : (root.detailNode && Number(root.detailNode.type) === 2
+                        ? "Remote repeater configuration is planned for a later milestone."
+                        : "")
+                  visible: text !== ""
+                  color: root.confirmRemoval ? root.urgent : root.dim
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.bodySmall
+                }
+                Text {
+                  width: parent.width
+                  text: meshcore.managementError
+                  textFormat: Text.PlainText
+                  wrapMode: Text.WordWrap
+                  visible: text !== ""
+                  color: root.urgent
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.bodySmall
+                }
+                Rectangle {
+                  width: parent.width
+                  height: Style.space(42)
+                  radius: Style.cornerRadius
+                  color: removeContactMouse.containsMouse || root.confirmRemoval
+                    ? Style.hoverFillFor(root.foreground, root.urgent) : "transparent"
+                  border.width: 1
+                  border.color: root.urgent
+                  opacity: meshcore.managing ? 0.45 : 1
+                  Text {
+                    anchors.centerIn: parent
+                    text: meshcore.managing ? "Removing…" : (root.confirmRemoval ? "Confirm removal" : "Remove contact")
+                    color: root.urgent
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                    font.bold: true
+                  }
+                  MouseArea {
+                    id: removeContactMouse
+                    anchors.fill: parent
+                    enabled: !meshcore.managing
+                    hoverEnabled: true
+                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                    onClicked: root.confirmContactRemoval()
+                  }
+                }
               }
             }
           }

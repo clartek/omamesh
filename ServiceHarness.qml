@@ -7,9 +7,11 @@ ShellRoot {
   readonly property string sendKind: Quickshell.env("OMAMESH_SEND_KIND") || "direct"
   readonly property string expectedSendState: Quickshell.env("OMAMESH_SEND_STATE") || "delivered"
   readonly property string expectManagement: Quickshell.env("OMAMESH_EXPECT_MANAGEMENT")
+  readonly property bool expectTelemetry: Quickshell.env("OMAMESH_EXPECT_TELEMETRY") === "1"
   readonly property string transportSetting: Quickshell.env("OMAMESH_TRANSPORT") || "USB"
   property bool sendStarted: false
   property bool managementStarted: false
+  property bool telemetryStarted: false
 
   MeshCoreService {
     id: service
@@ -42,6 +44,12 @@ ShellRoot {
           console.error("OMAMESH_SMOKE_FAILED:management-rejected")
           Qt.exit(1)
         }
+      } else if (live && !busy && expectTelemetry && !telemetryStarted) {
+        telemetryStarted = true
+        if (!requestTelemetry("001122334455")) {
+          console.error("OMAMESH_SMOKE_FAILED:telemetry-rejected")
+          Qt.exit(1)
+        }
       } else if (live && !busy && expectSend && !sendStarted && messages.length === 1) {
         sendStarted = true
         var target = sendKind === "channel" ? "channel:0" : "contact:001122334455"
@@ -49,7 +57,7 @@ ShellRoot {
           console.error("OMAMESH_SMOKE_FAILED:send-rejected")
           Qt.exit(1)
         }
-      } else if (live && !busy && !expectSend && (!expectMessage || messages.length === 1)) {
+      } else if (live && !busy && !expectSend && expectManagement === "" && !expectTelemetry && (!expectMessage || messages.length === 1)) {
         console.info("OMAMESH_SMOKE_LIVE:contacts=" + nodes.length + ":channels=" + channels.length + ":messages=" + messages.length + ":unread=" + unreadCount + ":transport=" + transport)
         Qt.quit()
       }
@@ -78,6 +86,18 @@ ShellRoot {
           return
         }
         console.info("OMAMESH_SMOKE_MANAGE:kind=" + expectManagement + ":state=" + managementState + ":channels=" + channels.length + ":nodes=" + nodes.length)
+        Qt.quit()
+      }
+    }
+
+    onRequestingTelemetryChanged: {
+      if (telemetryStarted && !requestingTelemetry) {
+        if (telemetryState !== "succeeded" || telemetryRows.length !== 2) {
+          console.error("OMAMESH_SMOKE_FAILED:telemetry-state:" + telemetryState + ":rows=" + telemetryRows.length)
+          Qt.exit(1)
+          return
+        }
+        console.info("OMAMESH_SMOKE_TELEMETRY:state=" + telemetryState + ":rows=" + telemetryRows.length)
         Qt.quit()
       }
     }

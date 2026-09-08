@@ -188,4 +188,39 @@ assert.equal(
 assert.equal(model.safeCliError("", true, "tcp"), "The TCP companion did not respond in time")
 assert.equal(model.safeCliError("", true, "ble"), "The BLE companion did not respond in time")
 
+let telemCmd = model.buildTelemetryCommand("001122334455")
+assert.equal(telemCmd.ok, true)
+assert.equal(telemCmd.command, "req_telemetry 001122334455")
+assert.equal(model.buildTelemetryCommand("bad-id").ok, false)
+
+let telemResult = model.parseTelemetryResult([
+  {
+    name: "Fixture Friend",
+    pubkey_pre: "001122334455",
+    lpp: [
+      { channel: 1, type: "temperature", value: 21.5 },
+      { channel: 2, type: "voltage", value: 4.12 },
+      { channel: 3, type: "gps", value: { latitude: 41.2565, longitude: -95.9345, altitude: 320 } },
+      { channel: 4, type: "switch", value: true },
+      { channel: 5, type: "illuminance", value: 450 }
+    ]
+  }
+], false)
+assert.equal(telemResult.ok, true)
+assert.equal(telemResult.rows.length, 5)
+assert.equal(telemResult.rows[0].label, "Temperature")
+assert.equal(telemResult.rows[0].value, "21.5 °C")
+assert.equal(telemResult.rows[1].label, "Voltage")
+assert.equal(telemResult.rows[1].value, "4.12 V")
+assert.equal(telemResult.rows[2].label, "GPS")
+assert.equal(telemResult.rows[2].value, "Lat 41.2565  ·  Lon -95.9345  ·  Alt 320")
+assert.equal(telemResult.rows[3].label, "Switch")
+assert.equal(telemResult.rows[3].value, "On")
+assert.equal(telemResult.rows[4].label, "Illuminance")
+assert.equal(telemResult.rows[4].value, "450 lux")
+
+assert.equal(model.parseTelemetryResult([], true).ok, false)
+assert.equal(model.parseTelemetryResult([{ error: "Getting data" }], false).ok, false)
+assert.equal(model.parseTelemetryResult([{ error: "unknown contact" }], false).ok, false)
+assert.equal(model.parseTelemetryResult([{ lpp: [] }], false).ok, false)
 console.log("Model tests passed.")

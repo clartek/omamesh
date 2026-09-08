@@ -595,6 +595,91 @@ function buildRemoveContactCommand(keyPrefix) {
   return { ok: true, command: "remove_contact " + prefix, error: "" }
 }
 
+function buildTelemetryCommand(keyPrefix) {
+  var prefix = String(keyPrefix || "").trim().toLowerCase()
+  if (!/^[0-9a-f]{12}$/.test(prefix))
+    return { ok: false, command: "", error: "The contact identifier is invalid" }
+  return { ok: true, command: "req_telemetry " + prefix, error: "" }
+}
+
+function _telemetryValue(value) {
+  if (typeof value === "number")
+    return isFinite(value) ? String(Math.round(value * 1000) / 1000) : ""
+  if (typeof value === "boolean") return value ? "On" : "Off"
+  if (!value || typeof value !== "object" || Array.isArray(value)) return ""
+  var labels = {
+    acc_x: "X", acc_y: "Y", acc_z: "Z",
+    latitude: "Lat", longitude: "Lon", altitude: "Alt",
+    red: "Red", green: "Green", blue: "Blue"
+  }
+  var allowed = ["acc_x", "acc_y", "acc_z", "latitude", "longitude", "altitude", "red", "green", "blue"]
+  var parts = []
+  for (var i = 0; i < allowed.length; i++) {
+    var key = allowed[i]
+    if (value[key] === undefined || !isFinite(Number(value[key]))) continue
+    parts.push(labels[key] + " " + String(Math.round(Number(value[key]) * 100000) / 100000))
+  }
+  return parts.join("  ·  ")
+}
+
+function _telemetryUnit(type) {
+  switch (type) {
+  case "temperature": return " °C"
+  case "humidity": case "percentage": return " %"
+  case "barometer": return " hPa"
+  case "voltage": return " V"
+  case "current": return " A"
+  case "frequency": return " Hz"
+  case "altitude": case "distance": return " m"
+  case "power": return " W"
+  case "energy": return " kWh"
+  case "illuminance": return " lux"
+  case "load": return " kg"
+  case "concentration": return " ppm"
+  default: return ""
+  }
+}
+
+function parseTelemetryResult(documents, sawError) {
+  if (sawError) return { ok: false, rows: [], error: "The node did not return telemetry" }
+  var list = safeArray(documents)
+  var payload = null
+  for (var i = 0; i < list.length; i++) {
+    if (list[i] && typeof list[i] === "object" && !Array.isArray(list[i])) {
+      if (list[i].error) {
+        var err = String(list[i].error).toLowerCase()
+        if (err.indexOf("contact") !== -1)
+          return { ok: false, rows: [], error: "The contact was not found" }
+        return { ok: false, rows: [], error: "The node did not return telemetry" }
+      }
+      if (Array.isArray(list[i].lpp)) {
+        payload = list[i]
+        break
+      }
+    }
+  }
+  if (payload === null) return { ok: false, rows: [], error: "The telemetry response was invalid" }
+  var rows = []
+  for (var j = 0; j < payload.lpp.length && rows.length < 64; j++) {
+    var source = payload.lpp[j]
+    if (!source || typeof source !== "object" || Array.isArray(source)) continue
+    var channel = Number(source.channel)
+    if (!isFinite(channel) || channel < 0 || channel > 255) continue
+    var type = _text(source.type, "Sensor", 40).toLowerCase()
+    var valueText = _telemetryValue(source.value)
+    if (valueText === "") continue
+    var label = type === "gps" ? "GPS" : type.replace(/(^|\s)[a-z]/g, function(match) { return match.toUpperCase() })
+    rows.push({
+      channel: Math.floor(channel),
+      label: label,
+      value: valueText + _telemetryUnit(type)
+    })
+  }
+  if (rows.length === 0)
+    return { ok: false, rows: [], error: "The node returned no supported telemetry values" }
+  return { ok: true, rows: rows, error: "" }
+}
+
 function parseSendResult(kind, documents, sawError) {
   var list = safeArray(documents)
   if (sawError) return { accepted: false, state: "failed", error: "meshcore-cli could not send the message" }

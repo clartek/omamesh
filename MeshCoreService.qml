@@ -46,6 +46,16 @@ Item {
   property bool managing: false
   property string managementState: "idle"
   property string managementError: ""
+  property int _telemetryCounter: 0
+  property bool _telemetryCapturing: false
+  property bool _telemetrySawError: false
+  property var _telemetryDocuments: []
+  property string telemetryNodePrefix: ""
+  property var telemetryRows: []
+  property int telemetryUpdatedAt: 0
+  property bool requestingTelemetry: false
+  property string telemetryState: "idle"
+  property string telemetryError: ""
 
   readonly property int refreshIntervalSec: Model.clampRefreshInterval(
     settings && settings.refreshIntervalSec !== undefined ? settings.refreshIntervalSec : 10
@@ -78,7 +88,7 @@ Item {
   readonly property string batteryText: companion ? Model.batteryLabel(companion.batteryMv) : ""
   readonly property string radioText: companion && companion.radio ? companion.radio.label : ""
   readonly property int unreadCount: Model.totalUnread(channels, nodes)
-  readonly property bool busy: root._refreshPipeline || root._snapshotPending || root.sending || root.managing || backendProbe.running || companionProbe.running || dataProbe.running
+  readonly property bool busy: root._refreshPipeline || root._snapshotPending || root.sending || root.managing || root.requestingTelemetry || backendProbe.running || companionProbe.running || dataProbe.running
   readonly property bool live: eventSession.running && root._sessionReady
 
   function refresh() {
@@ -140,7 +150,7 @@ Item {
 
   function requestSnapshot(force) {
     if (!eventSession.running || !root._sessionReady || root._snapshotPending) return
-    if (!force && (root.sending || root.managing)) return
+    if (!force && (root.sending || root.managing || root.requestingTelemetry)) return
     root._snapshotPending = true
     snapshotTimeout.restart()
     eventSession.write("echo __OMAMESH_CONTACTS__\n")
@@ -185,9 +195,9 @@ Item {
       root.sendError = built.error
       return false
     }
-    if (!root.live || root.sending) {
+    if (!root.live || root.sending || root.managing || root.requestingTelemetry) {
       root.sendState = "failed"
-      root.sendError = root.sending ? "Another message is still sending" : "The companion is not connected"
+      root.sendError = root.live ? "Another companion operation is still running" : "The companion is not connected"
       return false
     }
 
@@ -295,10 +305,80 @@ Item {
     })
   }
 
+  function requestTelemetry(keyPrefix) {
+    var built = Model.buildTelemetryCommand(keyPrefix)
+    if (!built.ok) {
+      root.telemetryState = "failed"
+      root.telemetryError = built.error
+      return false
+    }
+    if (!root.live || root.sending || root.managing || root.requestingTelemetry) {
+      root.telemetryState = "failed"
+      root.telemetryError = root.live
+        ? "Another companion operation is still running"
+        : "The companion is not connected"
+      return false
+    }
+    root._telemetryCounter += 1
+    root._telemetryDocuments = []
+    root._telemetrySawError = false
+    root._telemetryCapturing = false
+    root.telemetryNodePrefix = String(keyPrefix).toLowerCase()
+    root.telemetryRows = []
+    root.telemetryUpdatedAt = 0
+    root.requestingTelemetry = true
+    root.telemetryState = "loading"
+    root.telemetryError = ""
+    telemetryTimeout.restart()
+    eventSession.write("echo __OMAMESH_TELEMETRY_START_" + root._telemetryCounter + "__\n")
+    eventSession.write(built.command + "\n")
+    eventSession.write("echo __OMAMESH_TELEMETRY_END_" + root._telemetryCounter + "__\n")
+    return true
+  }
+
+  function finishTelemetry() {
+    if (!root.requestingTelemetry) return
+    telemetryTimeout.stop()
+    var result = Model.parseTelemetryResult(root._telemetryDocuments, root._telemetrySawError)
+    root.telemetryRows = result.rows
+    root.telemetryUpdatedAt = result.ok ? Math.floor(Date.now() / 1000) : 0
+    root.telemetryState = result.ok ? "succeeded" : "failed"
+    root.telemetryError = result.error
+    root.requestingTelemetry = false
+    root._telemetryCapturing = false
+    root._telemetrySawError = false
+    root._telemetryDocuments = []
+  }
+
+  function failTelemetry(message) {
+    telemetryTimeout.stop()
+    root.telemetryState = "failed"
+    root.telemetryError = message
+    root.requestingTelemetry = false
+    root._telemetryCapturing = false
+    root._telemetrySawError = false
+    root._telemetryDocuments = []
+  }
+
+  function resetTelemetryStatus() {
+    if (root.requestingTelemetry) return
+    root.telemetryState = "idle"
+    root.telemetryError = ""
+  }
+
+  function clearTelemetry() {
+    if (root.requestingTelemetry) return
+    root.telemetryNodePrefix = ""
+    root.telemetryRows = []
+    root.telemetryUpdatedAt = 0
+    root.telemetryState = "idle"
+    root.telemetryError = ""
+  }
+
   function startManagement(command, transaction) {
-    if (!root.live || root.managing || root.sending) {
+    if (!root.live || root.managing || root.sending || root.requestingTelemetry) {
       root.managementState = "failed"
-      root.managementError = root.managing || root.sending
+      root.managementError = root.live
         ? "Another companion operation is still running"
         : "The companion is not connected"
       return false
@@ -381,6 +461,10 @@ Item {
       root._sendDocuments = root._sendDocuments.concat([value])
       return
     }
+    if (root._telemetryCapturing) {
+      root._telemetryDocuments = root._telemetryDocuments.concat([value])
+      return
+    }
     if (root._managementCapturing) return
     if (Array.isArray(value) && root._expectedDocument === "") {
       for (var i = 0; i < value.length; i++) root.ingestMessage(value[i])
@@ -422,6 +506,21 @@ Item {
 
   function handleStreamLine(line) {
     var text = String(line || "")
+    if (root.requestingTelemetry) {
+      var telemetryId = root._telemetryCounter
+      if (text.indexOf("__OMAMESH_TELEMETRY_START_" + telemetryId + "__") !== -1) {
+        root._telemetryCapturing = true
+        root._streamBuffer = ""
+        return
+      }
+      if (text.indexOf("__OMAMESH_TELEMETRY_END_" + telemetryId + "__") !== -1) {
+        root.finishTelemetry()
+        return
+      }
+      if (root._telemetryCapturing
+          && /^(?:[^>\n]{0,96}>\s*)?(?:Error getting data|Unknown contact|Timeout waiting telemetry)/i.test(text))
+        root._telemetrySawError = true
+    }
     if (root.managing && root._managementTransaction !== null) {
       var managementId = root._managementTransaction.id
       if (text.indexOf("__OMAMESH_MANAGE_START_" + managementId + "__") !== -1) {
@@ -613,6 +712,7 @@ Item {
       snapshotTimeout.stop()
       if (root.sending) root.failSend("The companion connection was lost while sending")
       if (root.managing) root.failManagement("The companion connection was lost while applying the change")
+      if (root.requestingTelemetry) root.failTelemetry("The companion connection was lost while requesting telemetry")
       if (root._sessionStopping) {
         root._sessionStopping = false
         if (root._restartAfterStop) {
@@ -675,6 +775,13 @@ Item {
   }
 
   Timer {
+    id: telemetryTimeout
+    interval: Math.max(10000, root.commandTimeoutSec * 1000)
+    repeat: false
+    onTriggered: root.failTelemetry("The telemetry request timed out")
+  }
+
+  Timer {
     id: reconnectTimer
     interval: 5000
     repeat: false
@@ -727,6 +834,7 @@ Item {
     snapshotTimeout.stop()
     sendTimeout.stop()
     managementTimeout.stop()
+    telemetryTimeout.stop()
     reconnectTimer.stop()
     root._sessionStopping = true
     if (backendProbe.running) backendProbe.running = false

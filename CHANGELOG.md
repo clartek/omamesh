@@ -6,8 +6,9 @@
 - Added contact, channel, conversation, unread, and coordinate overview UI.
 - Added direct and channel sending with transaction and failure states.
 - Added channel creation, channel removal, and contact removal workflows.
+- Added remote node telemetry requests and Cayenne LPP sensor display.
 - Added configurable TCP and manual BLE companion transports.
-- Added fixture coverage for transports, messaging, and management commands.
+- Added fixture coverage for transports, messaging, management, and telemetry.
 
 Sending, management, TCP, and manual BLE remain preview features pending live
 validation. BLE discovery and geographic map tiles are not yet implemented.

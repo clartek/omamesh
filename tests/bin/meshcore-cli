@@ -58,6 +58,17 @@ elif [[ "$args" == *" -i "* ]]; then
         fi
         ;;
       chan\ *) printf '%s\n' '{}' ;;
+      "echo __OMAMESH_TELEMETRY_START_"*"__"|"echo __OMAMESH_TELEMETRY_END_"*"__") printf '%s\n' "${line#echo }" ;;
+      "req_telemetry 001122334455")
+        if [[ "${OMAMESH_FAKE_TELEMETRY:-succeed}" == "empty" ]]; then
+          printf '%s\n' '{"name":"Fixture Friend","pubkey_pre":"001122334455","lpp":[]}'
+        elif [[ "${OMAMESH_FAKE_TELEMETRY:-succeed}" == "error" ]]; then
+          printf '%s\n' '{"error":"Getting data"}'
+        else
+          printf '%s\n' '{"name":"Fixture Friend","pubkey_pre":"001122334455","lpp":[{"channel":1,"type":"temperature","value":21.5},{"channel":2,"type":"voltage","value":4.12}]}'
+        fi
+        ;;
+      req_telemetry\ *) printf '%s\n' '{"error":"unknown contact"}' ;;
       "echo __OMAMESH_MANAGE_START_"*"__"|"echo __OMAMESH_MANAGE_END_"*"__") printf '%s\n' "${line#echo }" ;;
       add_channel\ *) channel_added=1 ;;
       "remove_channel 1") channel_added=0 ;;
