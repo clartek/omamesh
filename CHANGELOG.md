@@ -7,11 +7,12 @@
 - Added direct and channel sending with transaction and failure states.
 - Added channel creation, channel removal, and contact removal workflows.
 - Added remote node telemetry requests and Cayenne LPP sensor display.
+- Added interactive slippy map canvas with street tiles, pan and zoom, and node pins.
 - Added configurable TCP and manual BLE companion transports.
 - Added fixture coverage for transports, messaging, management, and telemetry.
 
 Sending, management, TCP, and manual BLE remain preview features pending live
-validation. BLE discovery and geographic map tiles are not yet implemented.
+validation. BLE discovery is not yet implemented.
 
 ## 0.1.0
 

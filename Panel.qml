@@ -24,6 +24,31 @@ Panel {
   property string newChannelName: ""
   property string newChannelSecret: ""
   property bool confirmRemoval: false
+  property double mapCenterLat: 41.2565
+  property double mapCenterLon: -95.9345
+  property int mapZoom: 12
+  property bool mapUserPanned: false
+  property bool mapTilesActive: root.settings && root.settings.enableMapTiles !== undefined ? root.settings.enableMapTiles : true
+  readonly property string mapTileProvider: root.settings && root.settings.mapTileProvider ? root.settings.mapTileProvider : "carto-dark"
+  readonly property var mapLocatedNodes: Model.filterContacts(meshcore.nodes, "").filter(function(n) { return n && n.hasLocation })
+  readonly property var mapProjectedNodes: Model.projectMapNodes(
+    meshcore.nodes,
+    root.mapCenterLat,
+    root.mapCenterLon,
+    root.mapZoom,
+    coordinateMap ? coordinateMap.width : 400,
+    coordinateMap ? coordinateMap.height : 350
+  )
+  readonly property var mapTiles: root.mapTilesActive && root.selectedTab === 2
+    ? Model.calculateTileGrid(
+        root.mapCenterLat,
+        root.mapCenterLon,
+        root.mapZoom,
+        coordinateMap ? coordinateMap.width : 400,
+        coordinateMap ? coordinateMap.height : 350,
+        root.mapTileProvider
+      )
+    : []
   readonly property bool hasSubview: root.conversationId !== "" || root.detailNode !== null || root.managementView !== ""
   readonly property var conversationMessages: Model.messagesForConversation(meshcore.messages, conversationId)
   readonly property var filteredNodes: Model.filterContacts(meshcore.nodes, searchQuery, contactTypeFilter)
@@ -43,7 +68,39 @@ Panel {
   function toggle() { root.opened ? root.close() : root.open() }
   function closeForPopoutSwitch() { root.close() }
   function refresh() { meshcore.refresh() }
-  function selectTab(index) { root.selectedTab = Math.max(0, Math.min(2, index)) }
+  function selectTab(index) {
+    root.selectedTab = Math.max(0, Math.min(2, index))
+    if (root.selectedTab === 2 && !root.mapUserPanned) root.recenterMap()
+  }
+  function recenterMap() {
+    var bounds = Model.calculateMapBounds(
+      meshcore.nodes,
+      coordinateMap ? coordinateMap.width : 400,
+      coordinateMap ? coordinateMap.height : 350
+    )
+    root.mapCenterLat = bounds.centerLat
+    root.mapCenterLon = bounds.centerLon
+    root.mapZoom = bounds.zoom
+    root.mapUserPanned = false
+  }
+  function zoomMap(delta) {
+    var nextZoom = Math.max(3, Math.min(18, root.mapZoom + delta))
+    if (nextZoom !== root.mapZoom) {
+      root.mapZoom = nextZoom
+      root.mapUserPanned = true
+    }
+  }
+  function panMap(deltaPixelX, deltaPixelY) {
+    if (deltaPixelX === 0 && deltaPixelY === 0) return
+    var centerPt = Model.latLonToWorld(root.mapCenterLat, root.mapCenterLon, root.mapZoom)
+    var newCoords = Model.worldToLatLon(centerPt.x - deltaPixelX, centerPt.y - deltaPixelY, root.mapZoom)
+    root.mapCenterLat = newCoords.latitude
+    root.mapCenterLon = newCoords.longitude
+    root.mapUserPanned = true
+  }
+  function toggleMapTiles() {
+    root.mapTilesActive = !root.mapTilesActive
+  }
   function openConversation(id, title) {
     root.detailNode = null
     root.managementView = ""
@@ -163,6 +220,10 @@ Panel {
         else if (text === "1") root.selectTab(0)
         else if (text === "2") root.selectTab(1)
         else if (text === "3") root.selectTab(2)
+        else if (text === "+" || text === "=") { if (root.selectedTab === 2) root.zoomMap(1) }
+        else if (text === "-" || text === "_") { if (root.selectedTab === 2) root.zoomMap(-1) }
+        else if (text === "0" || text === "c" || text === "C") { if (root.selectedTab === 2) root.recenterMap() }
+        else if (text === "t" || text === "T") { if (root.selectedTab === 2) root.toggleMapTiles() }
         else if (text === "/" && !root.hasSubview && root.selectedTab < 2) searchField.forceActiveFocus()
       }
 
@@ -931,19 +992,95 @@ Panel {
             anchors.fill: parent
             visible: meshcore.connectionState === "connected" && !root.hasSubview && root.selectedTab === 2
             spacing: Style.space(8)
+
             Row {
               width: parent.width
               height: Style.space(32)
-              Text { width: parent.width - mapCount.width; text: "NETWORK POSITIONS"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; font.letterSpacing: 1 }
-              Text { id: mapCount; text: root.mappedNodes.length + " LOCATED"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
+              spacing: Style.space(8)
+
+              Text {
+                width: parent.width - mapControlsRow.width - parent.spacing
+                anchors.verticalCenter: parent.verticalCenter
+                text: "NETWORK POSITIONS"
+                color: root.dim
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.bodySmall
+                font.letterSpacing: 1
+              }
+
+              Row {
+                id: mapControlsRow
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Style.space(6)
+
+                Text {
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: root.mapLocatedNodes.length + " LOCATED"
+                  color: root.dim
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                }
+
+                Rectangle {
+                  width: Style.space(26); height: width; radius: Style.cornerRadius
+                  color: mapFitMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
+                  border.width: 1
+                  border.color: root.mapUserPanned ? Color.accent : Style.hoverFillFor(root.foreground, Color.accent)
+                  Text { anchors.centerIn: parent; text: "󰍉"; color: root.mapUserPanned ? Color.accent : root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
+                  MouseArea {
+                    id: mapFitMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.recenterMap()
+                  }
+                }
+
+                Rectangle {
+                  width: Style.space(26); height: width; radius: Style.cornerRadius
+                  color: mapModeMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
+                  border.width: 1
+                  border.color: root.mapTilesActive ? Color.accent : Style.hoverFillFor(root.foreground, Color.accent)
+                  Text { anchors.centerIn: parent; text: root.mapTilesActive ? "󰆋" : "󰙀"; color: root.mapTilesActive ? Color.accent : root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
+                  MouseArea {
+                    id: mapModeMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.toggleMapTiles()
+                  }
+                }
+              }
             }
+
             Rectangle {
               id: coordinateMap
               width: parent.width
               height: parent.height - Style.space(40)
               radius: Style.cornerRadius
-              color: Style.hoverFillFor(root.foreground, Color.accent)
+              color: root.mapTilesActive ? "#0e1014" : Style.hoverFillFor(root.foreground, Color.accent)
               clip: true
+
+              Item {
+                id: tileContainer
+                anchors.fill: parent
+                visible: root.mapTilesActive
+
+                Repeater {
+                  model: root.mapTiles
+                  delegate: Image {
+                    required property var modelData
+                    x: modelData.x
+                    y: modelData.y
+                    width: 256
+                    height: 256
+                    source: modelData.url
+                    fillMode: Image.Stretch
+                    asynchronous: true
+                    cache: true
+                  }
+                }
+              }
 
               Repeater {
                 model: 5
@@ -952,7 +1089,7 @@ Panel {
                   x: coordinateMap.width * (index + 1) / 6
                   width: 1
                   height: coordinateMap.height
-                  color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08)
+                  color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, root.mapTilesActive ? 0.04 : 0.08)
                 }
               }
               Repeater {
@@ -962,14 +1099,40 @@ Panel {
                   y: coordinateMap.height * (index + 1) / 8
                   width: coordinateMap.width
                   height: 1
-                  color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08)
+                  color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, root.mapTilesActive ? 0.04 : 0.08)
+                }
+              }
+
+              MouseArea {
+                id: mapDragArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: pressed ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                property real lastX: 0
+                property real lastY: 0
+                onPressed: function(mouse) {
+                  lastX = mouse.x
+                  lastY = mouse.y
+                }
+                onPositionChanged: function(mouse) {
+                  if (pressed) {
+                    var dx = mouse.x - lastX
+                    var dy = mouse.y - lastY
+                    lastX = mouse.x
+                    lastY = mouse.y
+                    root.panMap(dx, dy)
+                  }
+                }
+                onWheel: function(wheel) {
+                  if (wheel.angleDelta.y > 0) root.zoomMap(1)
+                  else if (wheel.angleDelta.y < 0) root.zoomMap(-1)
                 }
               }
 
               Column {
                 anchors.centerIn: parent
                 width: parent.width - Style.space(40)
-                visible: root.mappedNodes.length === 0
+                visible: root.mapLocatedNodes.length === 0
                 spacing: Style.space(8)
                 Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; text: "󰆋"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.space(42) }
                 Text { width: parent.width; horizontalAlignment: Text.AlignHCenter; text: "No advertised locations"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.title; font.bold: true }
@@ -977,36 +1140,61 @@ Panel {
               }
 
               Repeater {
-                model: root.mappedNodes
+                model: root.mapProjectedNodes
                 delegate: Item {
                   required property var modelData
-                  width: Style.space(110)
-                  height: Style.space(62)
-                  x: modelData.mapX * (coordinateMap.width - width)
-                  y: modelData.mapY * (coordinateMap.height - height)
+                  visible: modelData.inView
+                  width: Style.space(90)
+                  height: Style.space(56)
+                  x: modelData.pixelX - width / 2
+                  y: modelData.pixelY - Style.space(38) / 2
+                  z: markerMouse.containsMouse ? 20 : 5
+
                   Rectangle {
+                    id: pinBadge
                     anchors.horizontalCenter: parent.horizontalCenter
-                    width: Style.space(38)
+                    width: Style.space(36)
                     height: width
                     radius: width / 2
-                    color: Color.accent
+                    color: markerMouse.containsMouse
+                      ? Color.accent
+                      : (Number(modelData.type) === 2 ? Color.warning : Color.accent)
                     border.width: 2
                     border.color: root.foreground
-                    Text { anchors.centerIn: parent; text: modelData.icon; color: Color.background; font.family: root.fontFamily; font.pixelSize: Style.font.icon }
+                    Text {
+                      anchors.centerIn: parent
+                      text: modelData.icon || "󰒍"
+                      color: Color.background
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.icon
+                    }
                   }
-                  Text {
-                    anchors.bottom: parent.bottom
-                    width: parent.width
-                    horizontalAlignment: Text.AlignHCenter
-                    text: modelData.name
-                    textFormat: Text.PlainText
-                    elide: Text.ElideRight
-                    color: root.foreground
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.caption
-                    font.bold: true
+
+                  Rectangle {
+                    anchors.top: pinBadge.bottom
+                    anchors.topMargin: Style.space(2)
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: Math.min(parent.width, nodeNameText.implicitWidth + Style.space(8))
+                    height: nodeNameText.implicitHeight + Style.space(3)
+                    radius: Style.cornerRadius
+                    color: Qt.rgba(0, 0, 0, 0.82)
+                    Text {
+                      id: nodeNameText
+                      anchors.centerIn: parent
+                      width: parent.width - Style.space(6)
+                      horizontalAlignment: Text.AlignHCenter
+                      text: modelData.name
+                      textFormat: Text.PlainText
+                      elide: Text.ElideRight
+                      color: Color.foreground
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      font.bold: true
+                    }
                   }
+
                   MouseArea {
+                    id: markerMouse
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
@@ -1015,14 +1203,62 @@ Panel {
                 }
               }
 
-              Text {
+              Column {
+                anchors.top: parent.top
+                anchors.right: parent.right
+                anchors.margins: Style.space(8)
+                spacing: Style.space(4)
+                z: 30
+
+                Rectangle {
+                  width: Style.space(28); height: width; radius: Style.cornerRadius
+                  color: zoomInMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : Qt.rgba(0, 0, 0, 0.65)
+                  border.width: 1
+                  border.color: Style.hoverFillFor(root.foreground, Color.accent)
+                  Text { anchors.centerIn: parent; text: "+"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
+                  MouseArea {
+                    id: zoomInMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                    onClicked: root.zoomMap(1)
+                  }
+                }
+
+                Rectangle {
+                  width: Style.space(28); height: width; radius: Style.cornerRadius
+                  color: zoomOutMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : Qt.rgba(0, 0, 0, 0.65)
+                  border.width: 1
+                  border.color: Style.hoverFillFor(root.foreground, Color.accent)
+                  Text { anchors.centerIn: parent; text: "-"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
+                  MouseArea {
+                    id: zoomOutMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                    onClicked: root.zoomMap(-1)
+                  }
+                }
+              }
+
+              Row {
                 anchors.left: parent.left
+                anchors.right: parent.right
                 anchors.bottom: parent.bottom
                 anchors.margins: Style.space(8)
-                text: "Coordinate overview"
-                color: root.dim
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
+                z: 25
+
+                Text {
+                  width: parent.width - mapAttrText.implicitWidth
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: Model.locationLabel({ hasLocation: true, latitude: root.mapCenterLat, longitude: root.mapCenterLon }) + "  ·  z" + root.mapZoom
+                  color: root.dim
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                }
+
+                Text {
+                  id: mapAttrText
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: root.mapTilesActive ? (root.mapTileProvider === "osm" ? "OpenStreetMap" : "CartoDB") : "Offline Grid"
+                  color: root.dim
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                }
               }
             }
           }

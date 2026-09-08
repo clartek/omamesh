@@ -26,7 +26,9 @@
       "bleTarget": "",
       "blePair": false,
       "refreshIntervalSec": 10,
-      "commandTimeoutSec": 12
+      "commandTimeoutSec": 12,
+      "enableMapTiles": true,
+      "mapTileProvider": "carto-dark"
     },
     "schema": [
       {
@@ -86,6 +88,19 @@
         "max": 60,
         "step": 1,
         "defaultValue": 12
+      },
+      {
+        "key": "enableMapTiles",
+        "type": "boolean",
+        "label": "Enable online street map tiles",
+        "defaultValue": true
+      },
+      {
+        "key": "mapTileProvider",
+        "type": "enum",
+        "label": "Map tile provider",
+        "options": ["carto-dark", "carto-voyager", "osm"],
+        "defaultValue": "carto-dark"
       }
     ]
   }

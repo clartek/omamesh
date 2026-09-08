@@ -752,6 +752,159 @@ function locationLabel(item) {
   return latitude.toFixed(5) + ", " + longitude.toFixed(5)
 }
 
+function latLonToWorld(lat, lon, zoom) {
+  var z = Math.max(0, Math.min(22, Number(zoom) || 0))
+  var scale = 256 * Math.pow(2, z)
+  var clampedLon = Math.max(-180, Math.min(180, Number(lon) || 0))
+  var clampedLat = Math.max(-85.05112878, Math.min(85.05112878, Number(lat) || 0))
+  var x = ((clampedLon + 180) / 360) * scale
+  var sinLat = Math.sin(clampedLat * Math.PI / 180)
+  var sinClamped = Math.max(-0.9999, Math.min(0.9999, sinLat))
+  var y = (0.5 - Math.log((1 + sinClamped) / (1 - sinClamped)) / (4 * Math.PI)) * scale
+  return { x: x, y: y }
+}
+
+function worldToLatLon(x, y, zoom) {
+  var z = Math.max(0, Math.min(22, Number(zoom) || 0))
+  var scale = 256 * Math.pow(2, z)
+  var lon = (Number(x) / scale) * 360 - 180
+  var n = Math.PI - (2 * Math.PI * Number(y)) / scale
+  var sinh = (Math.exp(n) - Math.exp(-n)) / 2
+  var lat = (Math.atan(sinh) * 180) / Math.PI
+  return {
+    latitude: Math.max(-85.05112878, Math.min(85.05112878, lat)),
+    longitude: Math.max(-180, Math.min(180, lon))
+  }
+}
+
+function calculateMapBounds(items, width, height) {
+  var list = safeArray(items)
+  var located = []
+  var minLat = 90
+  var maxLat = -90
+  var minLon = 180
+  var maxLon = -180
+  for (var i = 0; i < list.length; i++) {
+    var item = list[i]
+    if (!item || !item.hasLocation) continue
+    var lat = Number(item.latitude)
+    var lon = Number(item.longitude)
+    if (!isFinite(lat) || !isFinite(lon) || lat < -85.0511 || lat > 85.0511 || lon < -180 || lon > 180)
+      continue
+    located.push(item)
+    minLat = Math.min(minLat, lat)
+    maxLat = Math.max(maxLat, lat)
+    minLon = Math.min(minLon, lon)
+    maxLon = Math.max(maxLon, lon)
+  }
+
+  if (located.length === 0)
+    return { centerLat: 41.2565, centerLon: -95.9345, zoom: 12, locatedCount: 0 }
+
+  var centerLat = (minLat + maxLat) / 2
+  var centerLon = (minLon + maxLon) / 2
+
+  if (located.length === 1)
+    return { centerLat: located[0].latitude, centerLon: located[0].longitude, zoom: 13, locatedCount: 1 }
+
+  var w = Math.max(120, (Number(width) || 400) - 80)
+  var h = Math.max(120, (Number(height) || 400) - 80)
+  var idealZoom = 13
+
+  for (var z = 17; z >= 2; z--) {
+    var pMin = latLonToWorld(maxLat, minLon, z)
+    var pMax = latLonToWorld(minLat, maxLon, z)
+    var spanX = Math.abs(pMax.x - pMin.x)
+    var spanY = Math.abs(pMax.y - pMin.y)
+    if (spanX <= w && spanY <= h) {
+      idealZoom = z
+      break
+    }
+  }
+
+  return {
+    centerLat: centerLat,
+    centerLon: centerLon,
+    zoom: Math.max(3, Math.min(16, idealZoom)),
+    locatedCount: located.length
+  }
+}
+
+function tileProviderUrl(provider, z, x, y) {
+  var subdomains = ["a", "b", "c", "d"]
+  var sub = subdomains[(x + y) % subdomains.length]
+  var name = String(provider || "").toLowerCase()
+  if (name === "osm")
+    return "https://tile.openstreetmap.org/" + z + "/" + x + "/" + y + ".png"
+  if (name === "carto-voyager")
+    return "https://" + sub + ".basemaps.cartocdn.com/rastertiles/voyager/" + z + "/" + x + "/" + y + ".png"
+  return "https://" + sub + ".basemaps.cartocdn.com/dark_all/" + z + "/" + x + "/" + y + ".png"
+}
+
+function calculateTileGrid(centerLat, centerLon, zoom, viewportWidth, viewportHeight, provider) {
+  var z = Math.max(1, Math.min(19, Math.round(Number(zoom) || 12)))
+  var vw = Math.max(10, Number(viewportWidth) || 400)
+  var vh = Math.max(10, Number(viewportHeight) || 300)
+  var centerPt = latLonToWorld(centerLat, centerLon, z)
+  var left = centerPt.x - vw / 2
+  var top = centerPt.y - vh / 2
+  var right = left + vw
+  var bottom = top + vh
+
+  var maxTileIndex = (1 << z) - 1
+  var minTileX = Math.floor(left / 256)
+  var maxTileX = Math.floor(right / 256)
+  var minTileY = Math.max(0, Math.floor(top / 256))
+  var maxTileY = Math.min(maxTileIndex, Math.floor(bottom / 256))
+
+  var tiles = []
+  for (var tx = minTileX; tx <= maxTileX && tiles.length < 64; tx++) {
+    for (var ty = minTileY; ty <= maxTileY && tiles.length < 64; ty++) {
+      var wrappedX = ((tx % (1 << z)) + (1 << z)) % (1 << z)
+      var px = Math.round(tx * 256 - left)
+      var py = Math.round(ty * 256 - top)
+      tiles.push({
+        key: z + "/" + wrappedX + "/" + ty,
+        x: px,
+        y: py,
+        url: tileProviderUrl(provider, z, wrappedX, ty)
+      })
+    }
+  }
+  return tiles
+}
+
+function projectMapNodes(items, centerLat, centerLon, zoom, viewportWidth, viewportHeight) {
+  var list = safeArray(items)
+  var z = Math.max(1, Math.min(19, Number(zoom) || 12))
+  var vw = Math.max(10, Number(viewportWidth) || 400)
+  var vh = Math.max(10, Number(viewportHeight) || 300)
+  var centerPt = latLonToWorld(centerLat, centerLon, z)
+  var left = centerPt.x - vw / 2
+  var top = centerPt.y - vh / 2
+
+  var results = []
+  for (var i = 0; i < list.length; i++) {
+    var item = list[i]
+    if (!item || !item.hasLocation) continue
+    var lat = Number(item.latitude)
+    var lon = Number(item.longitude)
+    if (!isFinite(lat) || !isFinite(lon) || lat < -85.0511 || lat > 85.0511 || lon < -180 || lon > 180)
+      continue
+    var pt = latLonToWorld(lat, lon, z)
+    var px = pt.x - left
+    var py = pt.y - top
+    var copy = {}
+    var keys = Object.keys(item)
+    for (var k = 0; k < keys.length; k++) copy[keys[k]] = item[keys[k]]
+    copy.pixelX = px
+    copy.pixelY = py
+    copy.inView = (px >= -80 && px <= vw + 80 && py >= -80 && py <= vh + 80)
+    results.push(copy)
+  }
+  return results
+}
+
 function mapPoints(items) {
   var list = safeArray(items)
   var located = []

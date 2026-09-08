@@ -223,4 +223,56 @@ assert.equal(model.parseTelemetryResult([], true).ok, false)
 assert.equal(model.parseTelemetryResult([{ error: "Getting data" }], false).ok, false)
 assert.equal(model.parseTelemetryResult([{ error: "unknown contact" }], false).ok, false)
 assert.equal(model.parseTelemetryResult([{ lpp: [] }], false).ok, false)
+
+let world0 = model.latLonToWorld(0, 0, 0)
+assert.equal(Math.round(world0.x), 128)
+assert.equal(Math.round(world0.y), 128)
+let rev0 = model.worldToLatLon(128, 128, 0)
+assert.equal(Math.round(rev0.latitude), 0)
+assert.equal(Math.round(rev0.longitude), 0)
+
+let omahaWorld = model.latLonToWorld(41.2565, -95.9345, 12)
+let omahaRev = model.worldToLatLon(omahaWorld.x, omahaWorld.y, 12)
+assert.equal(Math.abs(omahaRev.latitude - 41.2565) < 0.0001, true)
+assert.equal(Math.abs(omahaRev.longitude - -95.9345) < 0.0001, true)
+
+let emptyBounds = model.calculateMapBounds([], 400, 300)
+assert.equal(emptyBounds.locatedCount, 0)
+assert.equal(emptyBounds.zoom, 12)
+
+let singleBounds = model.calculateMapBounds([
+  { hasLocation: true, latitude: 41.2565, longitude: -95.9345 }
+], 400, 300)
+assert.equal(singleBounds.locatedCount, 1)
+assert.equal(singleBounds.centerLat, 41.2565)
+assert.equal(singleBounds.centerLon, -95.9345)
+assert.equal(singleBounds.zoom, 13)
+
+let multiBounds = model.calculateMapBounds([
+  { hasLocation: true, latitude: 41.2, longitude: -95.9 },
+  { hasLocation: true, latitude: 41.3, longitude: -96.0 },
+  { hasLocation: false }
+], 400, 300)
+assert.equal(multiBounds.locatedCount, 2)
+assert.equal(Math.abs(multiBounds.centerLat - 41.25) < 0.01, true)
+assert.equal(Math.abs(multiBounds.centerLon - -95.95) < 0.01, true)
+assert.equal(multiBounds.zoom >= 3 && multiBounds.zoom <= 16, true)
+
+let tiles = model.calculateTileGrid(41.2565, -95.9345, 12, 400, 300, "carto-dark")
+assert.equal(tiles.length >= 4, true)
+assert.equal(tiles[0].url.indexOf("basemaps.cartocdn.com") !== -1, true)
+
+let osmTiles = model.calculateTileGrid(41.2565, -95.9345, 12, 400, 300, "osm")
+assert.equal(osmTiles[0].url.indexOf("tile.openstreetmap.org") !== -1, true)
+
+let projectedNodes = model.projectMapNodes([
+  { name: "Omaha Friend", hasLocation: true, latitude: 41.2565, longitude: -95.9345 },
+  { name: "Distant Node", hasLocation: true, latitude: -33.8688, longitude: 151.2093 }
+], 41.2565, -95.9345, 12, 400, 300)
+assert.equal(projectedNodes.length, 2)
+assert.equal(Math.round(projectedNodes[0].pixelX), 200)
+assert.equal(Math.round(projectedNodes[0].pixelY), 150)
+assert.equal(projectedNodes[0].inView, true)
+assert.equal(projectedNodes[1].inView, false)
+
 console.log("Model tests passed.")
