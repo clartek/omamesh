@@ -115,7 +115,7 @@ Item {
   function connectCompanion() {
     if (root.busy) return
     if (root.transport === "ble" && root.connectionArgs.length === 0) {
-      root.disconnectState("Configure a BLE companion address or name")
+      root.disconnectState("Configure a BLE companion address or name", false)
       return
     }
     root._timedOut = false
@@ -129,7 +129,7 @@ Item {
     commandTimeout.restart()
   }
 
-  function disconnectState(message) {
+  function disconnectState(message, shouldRetry) {
     root._refreshPipeline = false
     root.companion = null
     root.nodes = []
@@ -137,6 +137,12 @@ Item {
     root.messages = []
     root.lastError = message
     root.connectionState = "error"
+    var canRetry = shouldRetry !== undefined ? shouldRetry : true
+    if (canRetry && root.backendAvailable && (root.transport !== "ble" || root.connectionArgs.length > 0)) {
+      reconnectTimer.restart()
+    } else {
+      reconnectTimer.stop()
+    }
   }
 
   function startEventSession() {
@@ -585,6 +591,7 @@ Item {
       root._sessionReady = true
       root.lastError = ""
       root.connectionState = "connected"
+      reconnectTimer.stop()
       sessionStartTimeout.stop()
       Qt.callLater(root.requestSnapshot)
     }
@@ -692,6 +699,7 @@ Item {
         root.companion = { name: parsed.name }
         root.lastError = ""
         root.connectionState = "connected"
+        reconnectTimer.stop()
         Qt.callLater(function() { root.runDataPhase("contacts") })
         return
       }
@@ -892,7 +900,12 @@ Item {
     repeat: false
     onTriggered: {
       root._sessionStopping = false
-      root.startEventSession()
+      if (root.connectionState === "connected" && eventSession.running) return
+      if (!root._probeComplete || !root.backendAvailable) {
+        root.refresh()
+      } else {
+        root.connectCompanion()
+      }
     }
   }
 

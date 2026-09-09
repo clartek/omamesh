@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "clartek.omamesh",
   "name": "Omamesh",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "author": "Josh Clarke",
   "license": "MIT",
   "description": "MeshCore companions, nodes, and messages in the Omarchy bar.",

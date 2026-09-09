@@ -31,9 +31,34 @@ Panel {
   property string editTransport: "USB"
   property string editTcpHost: "127.0.0.1"
   property string editTcpPort: "5000"
+  property string lastConfiguredTcpHost: ""
+  property string lastConfiguredTcpPort: ""
   property string editSerialPort: "/dev/ttyACM0"
   property string editBleTarget: ""
   property bool editBlePair: false
+
+  onSettingsChanged: {
+    if (root.settings) {
+      if (root.settings.tcpHost && root.settings.tcpHost !== "127.0.0.1") {
+        root.lastConfiguredTcpHost = root.settings.tcpHost
+      }
+      if (root.settings.tcpPort) {
+        root.lastConfiguredTcpPort = String(root.settings.tcpPort)
+      }
+    }
+  }
+
+  Component.onCompleted: {
+    if (root.settings) {
+      if (root.settings.tcpHost && root.settings.tcpHost !== "127.0.0.1") {
+        root.lastConfiguredTcpHost = root.settings.tcpHost
+      }
+      if (root.settings.tcpPort) {
+        root.lastConfiguredTcpPort = String(root.settings.tcpPort)
+      }
+    }
+    root.initConnectionEditor()
+  }
   property bool mapTilesActive: root.settings && root.settings.enableMapTiles !== undefined ? root.settings.enableMapTiles : true
   readonly property string mapTileProvider: root.settings && root.settings.mapTileProvider ? root.settings.mapTileProvider : "carto-dark"
   readonly property var mapLocatedNodes: Model.filterContacts(meshcore.nodes, "").filter(function(n) { return n && n.hasLocation })
@@ -139,8 +164,18 @@ Panel {
   function initConnectionEditor() {
     var curTransport = meshcore.transport
     root.editTransport = curTransport === "tcp" ? "TCP" : (curTransport === "ble" ? "BLE" : "USB")
-    root.editTcpHost = meshcore.tcpHost || (root.settings && root.settings.tcpHost ? root.settings.tcpHost : "127.0.0.1")
-    root.editTcpPort = String(meshcore.tcpPort || (root.settings && root.settings.tcpPort ? root.settings.tcpPort : 5000))
+    var rememberedHost = (root.settings && root.settings.tcpHost && root.settings.tcpHost !== "127.0.0.1")
+      ? root.settings.tcpHost
+      : (root.lastConfiguredTcpHost || (meshcore.tcpHost && meshcore.tcpHost !== "127.0.0.1" ? meshcore.tcpHost : (root.editTcpHost || "127.0.0.1")))
+    root.editTcpHost = rememberedHost
+    root.lastConfiguredTcpHost = rememberedHost
+
+    var rememberedPort = (root.settings && root.settings.tcpPort)
+      ? String(root.settings.tcpPort)
+      : (root.lastConfiguredTcpPort || String(meshcore.tcpPort || root.editTcpPort || 5000))
+    root.editTcpPort = rememberedPort
+    root.lastConfiguredTcpPort = rememberedPort
+
     root.editSerialPort = meshcore.serialPort || (root.settings && root.settings.serialPort ? root.settings.serialPort : "/dev/ttyACM0")
     root.editBleTarget = meshcore.bleTarget || (root.settings && root.settings.bleTarget ? root.settings.bleTarget : "")
     root.editBlePair = meshcore.blePair || (root.settings && root.settings.blePair === true)
@@ -162,6 +197,8 @@ Panel {
     var parsed = Model.normalizeTcpEndpoint(rawHost, rawPort)
     root.editTcpHost = parsed.host
     root.editTcpPort = String(parsed.port)
+    root.lastConfiguredTcpHost = parsed.host
+    root.lastConfiguredTcpPort = String(parsed.port)
 
     var updated = {
       transport: root.editTransport,
@@ -907,25 +944,37 @@ Panel {
 
                   Text { textFormat: Text.PlainText; text: "TCP HOST / IP ADDRESS"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
                   TextField {
+                    id: tcpHostField
                     width: parent.width
                     placeholderText: "127.0.0.1 or 192.168.1.50"
                     text: root.editTcpHost
                     maximumLength: 253
                     foreground: root.foreground
                     accent: Color.accent
-                    onTextChanged: root.editTcpHost = text
+                    onTextChanged: {
+                      if (root.editTcpHost !== text) {
+                        root.editTcpHost = text
+                        if (text.trim() !== "") root.lastConfiguredTcpHost = text.trim()
+                      }
+                    }
                     onAccepted: root.applyConnectionSettings()
                   }
 
                   Text { textFormat: Text.PlainText; text: "TCP PORT"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
                   TextField {
+                    id: tcpPortField
                     width: parent.width
                     placeholderText: "5000"
                     text: root.editTcpPort
                     maximumLength: 5
                     foreground: root.foreground
                     accent: Color.accent
-                    onTextChanged: root.editTcpPort = text
+                    onTextChanged: {
+                      if (root.editTcpPort !== text) {
+                        root.editTcpPort = text
+                        if (text.trim() !== "") root.lastConfiguredTcpPort = text.trim()
+                      }
+                    }
                     onAccepted: root.applyConnectionSettings()
                   }
 
@@ -957,6 +1006,8 @@ Panel {
                         onClicked: {
                           root.editTcpHost = "127.0.0.1"
                           root.editTcpPort = "5000"
+                          root.lastConfiguredTcpHost = "127.0.0.1"
+                          root.lastConfiguredTcpPort = "5000"
                         }
                       }
                     }
@@ -982,7 +1033,10 @@ Panel {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: root.editTcpPort = "5000"
+                        onClicked: {
+                          root.editTcpPort = "5000"
+                          root.lastConfiguredTcpPort = "5000"
+                        }
                       }
                     }
                   }

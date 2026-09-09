@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.2 - 2026-09-08
+
+- Added continuous auto-reconnection loop for USB Serial, TCP/IP, and Bluetooth LE companions when connections drop or fail.
+- Fixed TCP IP and port retention so previously entered endpoints are preserved across reconnection failures, editor visits, and shell restarts.
+- Improved reconnect lifecycle to probe companion readiness before resuming the interactive event stream.
+
 ## 1.0.1 - 2026-09-08
 
 - Added in-app Connection & Transport settings panel for dynamic TCP/IP, USB Serial, and BLE companion switching.
