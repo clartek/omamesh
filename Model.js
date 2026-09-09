@@ -25,18 +25,43 @@ function transport(value) {
   return "serial"
 }
 
-function tcpHost(value) {
-  var host = String(value === undefined || value === null ? "" : value).trim()
-  if (host === "" || host.length > 253 || /[\u0000-\u0020\u007f]/.test(host))
-    return "127.0.0.1"
-  if (!/^[A-Za-z0-9._:\-\[\]]+$/.test(host)) return "127.0.0.1"
-  return host
+function normalizeTcpEndpoint(rawHost, rawPort) {
+  var hostStr = String(rawHost === undefined || rawHost === null ? "" : rawHost).trim()
+  hostStr = hostStr.replace(/^(tcp|http|https):\/\//i, "")
+  var portNum = parseInt(String(rawPort), 10)
+
+  if (/^\[([A-Fa-f0-9:]+)\](?::(\d+))?$/.test(hostStr)) {
+    var match6 = hostStr.match(/^\[([A-Fa-f0-9:]+)\](?::(\d+))?$/)
+    hostStr = match6[1]
+    if (match6[2]) {
+      var p6 = parseInt(match6[2], 10)
+      if (isFinite(p6) && p6 >= 1 && p6 <= 65535) portNum = p6
+    }
+  } else if (/^([^:]+):(\d+)$/.test(hostStr)) {
+    var match4 = hostStr.match(/^([^:]+):(\d+)$/)
+    hostStr = match4[1]
+    var p4 = parseInt(match4[2], 10)
+    if (isFinite(p4) && p4 >= 1 && p4 <= 65535) portNum = p4
+  }
+
+  if (hostStr === "" || hostStr.length > 253 || /[\u0000-\u0020\u007f]/.test(hostStr) || !/^[A-Za-z0-9._:\-\[\]]+$/.test(hostStr)) {
+    hostStr = "127.0.0.1"
+  }
+  if (!isFinite(portNum) || portNum < 1 || portNum > 65535) {
+    portNum = 5000
+  }
+  return { host: hostStr, port: portNum }
 }
 
-function tcpPort(value) {
+function tcpHost(value) {
+  return normalizeTcpEndpoint(value).host
+}
+
+function tcpPort(value, hostValue) {
   var parsed = parseInt(String(value), 10)
-  if (!isFinite(parsed) || parsed < 1 || parsed > 65535) return 5000
-  return parsed
+  if (isFinite(parsed) && parsed >= 1 && parsed <= 65535) return parsed
+  if (hostValue !== undefined) return normalizeTcpEndpoint(hostValue, value).port
+  return 5000
 }
 
 function bleTarget(value) {
@@ -51,7 +76,7 @@ function connectionArguments(selectedTransport, settings) {
   var selected = transport(selectedTransport)
   var values = settings || {}
   if (selected === "tcp")
-    return ["-t", tcpHost(values.tcpHost), "-p", String(tcpPort(values.tcpPort))]
+    return ["-t", tcpHost(values.tcpHost), "-p", String(tcpPort(values.tcpPort, values.tcpHost))]
   if (selected === "ble") {
     var target = bleTarget(values.bleTarget)
     if (target === "") return []
@@ -99,6 +124,14 @@ function safeCliError(raw, timedOut, selectedTransport) {
     return "USB companion not found"
   if (/no response from meshcore node|serial companion/i.test(value))
     return "The serial device is not responding as a USB companion"
+  if (/connection refused|connect call failed/i.test(value))
+    return "Connection refused by the TCP companion"
+  if (/name or service not known|nodename nor servname provided|gaierror/i.test(value))
+    return "TCP companion hostname could not be resolved"
+  if (/no route to host|network is unreachable/i.test(value))
+    return "TCP companion network unreachable"
+  if (/connection reset by peer/i.test(value))
+    return "TCP companion closed connection"
   if (selected === "tcp") return "Could not connect to the TCP companion"
   if (selected === "ble") return "Could not connect to the BLE companion"
   return "Could not connect to the USB companion"

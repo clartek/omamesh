@@ -27,6 +27,7 @@ Item {
   property bool _sessionReady: false
   property bool _sessionStopping: false
   property bool _restartAfterStop: false
+  property bool _probeStopping: false
   property bool _snapshotPending: false
   property string _streamBuffer: ""
   property string _expectedDocument: ""
@@ -678,6 +679,10 @@ Item {
     onExited: function(exitCode) {
       companionProbeKillTimer.stop()
       commandTimeout.stop()
+      if (root._probeStopping) {
+        root._probeStopping = false
+        return
+      }
       if (root._timedOut) {
         root.disconnectState(Model.safeCliError("", true, root.transport))
         return
@@ -690,8 +695,9 @@ Item {
         Qt.callLater(function() { root.runDataPhase("contacts") })
         return
       }
-      root.disconnectState(root._nameError.trim() !== ""
-        ? Model.safeCliError(root._nameError, false, root.transport)
+      var combinedError = (root._nameError.trim() !== "" ? root._nameError : "") + "\n" + (root._nameOutput.trim() !== "" ? root._nameOutput : "")
+      root.disconnectState(combinedError.trim() !== ""
+        ? Model.safeCliError(combinedError, false, root.transport)
         : "meshcore-cli returned invalid companion data")
     }
   }
@@ -735,6 +741,10 @@ Item {
     onExited: function(exitCode) {
       dataProbeKillTimer.stop()
       commandTimeout.stop()
+      if (root._probeStopping) {
+        root._probeStopping = false
+        return
+      }
       if (root._timedOut) {
         root._refreshPipeline = false
         root.lastError = Model.safeCliError("", true, root.transport)
@@ -908,11 +918,31 @@ Item {
 
   function restartForSettingsChange() {
     reconnectTimer.stop()
+    commandTimeout.stop()
+    backendTimeout.stop()
+    sessionStartTimeout.stop()
+    snapshotDebounce.stop()
+    snapshotTimeout.stop()
+    if (companionProbe.running) {
+      root._probeStopping = true
+      companionProbe.signal(15)
+      companionProbe.running = false
+    }
+    if (dataProbe.running) {
+      root._probeStopping = true
+      dataProbe.signal(15)
+      dataProbe.running = false
+    }
+    root._refreshPipeline = false
     if (eventSession.running) {
       root._sessionStopping = true
       root._restartAfterStop = true
       eventSession.running = false
-    } else if (root._probeComplete) Qt.callLater(root.connectCompanion)
+    } else if (root._probeComplete) {
+      Qt.callLater(root.connectCompanion)
+    } else {
+      Qt.callLater(root.refresh)
+    }
   }
   onTransportChanged: root.restartForSettingsChange()
   onSerialPortChanged: if (root.transport === "serial") root.restartForSettingsChange()

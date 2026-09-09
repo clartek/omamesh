@@ -28,6 +28,12 @@ Panel {
   property double mapCenterLon: -95.9345
   property int mapZoom: 12
   property bool mapUserPanned: false
+  property string editTransport: "USB"
+  property string editTcpHost: "127.0.0.1"
+  property string editTcpPort: "5000"
+  property string editSerialPort: "/dev/ttyACM0"
+  property string editBleTarget: ""
+  property bool editBlePair: false
   property bool mapTilesActive: root.settings && root.settings.enableMapTiles !== undefined ? root.settings.enableMapTiles : true
   readonly property string mapTileProvider: root.settings && root.settings.mapTileProvider ? root.settings.mapTileProvider : "carto-dark"
   readonly property var mapLocatedNodes: Model.filterContacts(meshcore.nodes, "").filter(function(n) { return n && n.hasLocation })
@@ -130,12 +136,52 @@ Panel {
     root.newChannelSecret = ""
     meshcore.resetManagementStatus()
   }
+  function initConnectionEditor() {
+    var curTransport = meshcore.transport
+    root.editTransport = curTransport === "tcp" ? "TCP" : (curTransport === "ble" ? "BLE" : "USB")
+    root.editTcpHost = meshcore.tcpHost || (root.settings && root.settings.tcpHost ? root.settings.tcpHost : "127.0.0.1")
+    root.editTcpPort = String(meshcore.tcpPort || (root.settings && root.settings.tcpPort ? root.settings.tcpPort : 5000))
+    root.editSerialPort = meshcore.serialPort || (root.settings && root.settings.serialPort ? root.settings.serialPort : "/dev/ttyACM0")
+    root.editBleTarget = meshcore.bleTarget || (root.settings && root.settings.bleTarget ? root.settings.bleTarget : "")
+    root.editBlePair = meshcore.blePair || (root.settings && root.settings.blePair === true)
+  }
+  function saveSettings(updated) {
+    var entry = { id: root.moduleName }
+    if (root.settings) {
+      for (var key in root.settings) if (key !== "id") entry[key] = root.settings[key]
+    }
+    for (var k in updated) entry[k] = updated[k]
+    root.settings = entry
+    if (root.bar && root.bar.shell && typeof root.bar.shell.updateEntryInline === "function") {
+      root.bar.shell.updateEntryInline(root.moduleName, entry)
+    }
+  }
+  function applyConnectionSettings() {
+    var rawHost = root.editTcpHost.trim()
+    var rawPort = root.editTcpPort.trim()
+    var parsed = Model.normalizeTcpEndpoint(rawHost, rawPort)
+    root.editTcpHost = parsed.host
+    root.editTcpPort = String(parsed.port)
+
+    var updated = {
+      transport: root.editTransport,
+      serialPort: Model.serialPort(root.editSerialPort.trim()),
+      tcpHost: parsed.host,
+      tcpPort: parsed.port,
+      bleTarget: Model.bleTarget(root.editBleTarget.trim()),
+      blePair: root.editBlePair
+    }
+
+    root.saveSettings(updated)
+    meshcore.restartForSettingsChange()
+  }
   function openConnectionDetails() {
     root.conversationId = ""
     root.detailNode = null
     root.managedChannel = null
     root.managementView = "connection"
     root.confirmRemoval = false
+    root.initConnectionEditor()
   }
   function openChannelManagement(item) {
     root.conversationId = ""
@@ -222,6 +268,10 @@ Panel {
       onTabRequested: function(direction) { root.switchPanel(direction) }
       onTextKey: function(text) {
         if (text === "r" || text === "R") meshcore.refresh()
+        else if (text === "c" || text === "C") {
+          if (root.selectedTab === 2) root.recenterMap()
+          else root.openConnectionDetails()
+        }
         else if (text === "h" || text === "H") root.selectTab(root.selectedTab - 1)
         else if (text === "l" || text === "L") root.selectTab(root.selectedTab + 1)
         else if (text === "1") root.selectTab(0)
@@ -229,7 +279,7 @@ Panel {
         else if (text === "3") root.selectTab(2)
         else if (text === "+" || text === "=") { if (root.selectedTab === 2) root.zoomMap(1) }
         else if (text === "-" || text === "_") { if (root.selectedTab === 2) root.zoomMap(-1) }
-        else if (text === "0" || text === "c" || text === "C") { if (root.selectedTab === 2) root.recenterMap() }
+        else if (text === "0") { if (root.selectedTab === 2) root.recenterMap() }
         else if (text === "t" || text === "T") { if (root.selectedTab === 2) root.toggleMapTiles() }
         else if (text === "/" && !root.hasSubview && root.selectedTab < 2) searchField.forceActiveFocus()
       }
@@ -250,17 +300,31 @@ Panel {
               color: root.foreground
             }
           }
-          Column {
+          Item {
             width: parent.width - refreshButton.width - connectionButton.width - Style.space(68)
-            anchors.verticalCenter: parent.verticalCenter; spacing: Style.space(2)
-            Text { width: parent.width; textFormat: Text.PlainText; text: meshcore.companion ? meshcore.companion.name : "Omamesh"; color: root.foreground; elide: Text.ElideRight; font.family: root.fontFamily; font.pixelSize: Style.font.title; font.bold: true }
-            Text {
-              width: parent.width; textFormat: Text.PlainText
-              text: meshcore.connectionState === "connected"
-                ? (meshcore.batteryText ? meshcore.batteryText + "  ·  " : "") + meshcore.transportText + " connected  ·  " + meshcore.nodes.length + (meshcore.nodes.length === 1 ? " contact" : " contacts")
-                : (meshcore.lastError || meshcore.statusText)
-              color: meshcore.connectionState === "error" ? root.urgent : root.dim
-              elide: Text.ElideRight; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall
+            height: headCol.implicitHeight
+            anchors.verticalCenter: parent.verticalCenter
+            Column {
+              id: headCol
+              width: parent.width
+              spacing: Style.space(2)
+              Text { width: parent.width; textFormat: Text.PlainText; text: meshcore.companion ? meshcore.companion.name : "Omamesh"; color: root.foreground; elide: Text.ElideRight; font.family: root.fontFamily; font.pixelSize: Style.font.title; font.bold: true }
+              Text {
+                width: parent.width; textFormat: Text.PlainText
+                text: meshcore.connectionState === "connected"
+                  ? (meshcore.batteryText ? meshcore.batteryText + "  ·  " : "") + meshcore.transportText + " connected  ·  " + meshcore.nodes.length + (meshcore.nodes.length === 1 ? " contact" : " contacts")
+                  : (meshcore.lastError || meshcore.statusText)
+                color: meshcore.connectionState === "error" ? root.urgent : root.dim
+                elide: Text.ElideRight; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall
+              }
+            }
+            MouseArea {
+              anchors.fill: parent
+              cursorShape: Qt.PointingHandCursor
+              onClicked: {
+                if (root.managementView === "connection") root.leaveSubview()
+                else root.openConnectionDetails()
+              }
             }
           }
           Rectangle {
@@ -363,10 +427,54 @@ Panel {
           width: parent.width
           height: parent.height - Style.space(searchField.visible ? 156 : 116)
           Column {
-            anchors.centerIn: parent; width: parent.width; visible: meshcore.connectionState !== "connected"; spacing: Style.space(8)
+            anchors.centerIn: parent
+            width: parent.width - Style.space(32)
+            visible: meshcore.connectionState !== "connected" && !root.hasSubview
+            spacing: Style.space(10)
             Text { textFormat: Text.PlainText; width: parent.width; horizontalAlignment: Text.AlignHCenter; text: "󰛳"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.space(40) }
             Text { textFormat: Text.PlainText; width: parent.width; horizontalAlignment: Text.AlignHCenter; text: meshcore.statusText; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.title; font.bold: true }
-            Text { textFormat: Text.PlainText; width: parent.width; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; text: meshcore.lastError || "Connect a USB Serial Companion to begin."; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.body }
+            Text { textFormat: Text.PlainText; width: parent.width; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap; text: meshcore.lastError || "Connect a companion radio or configure TCP/IP endpoint."; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.body }
+
+            Rectangle {
+              height: Style.space(36)
+              width: configConnBtnText.implicitWidth + Style.space(28)
+              radius: Style.cornerRadius
+              anchors.horizontalCenter: parent.horizontalCenter
+              color: configConnMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
+              border.width: 1
+              border.color: Color.accent
+
+              Row {
+                anchors.centerIn: parent
+                spacing: Style.space(6)
+                Text {
+                  textFormat: Text.PlainText
+                  text: "󰒋"
+                  color: Color.accent
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.iconSmall
+                  anchors.verticalCenter: parent.verticalCenter
+                }
+                Text {
+                  id: configConnBtnText
+                  textFormat: Text.PlainText
+                  text: "Configure Connection"
+                  color: Color.accent
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.bodySmall
+                  font.bold: true
+                  anchors.verticalCenter: parent.verticalCenter
+                }
+              }
+
+              MouseArea {
+                id: configConnMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.openConnectionDetails()
+              }
+            }
           }
 
           ListView {
@@ -621,7 +729,7 @@ Panel {
           Column {
             anchors.fill: parent
             visible: root.managementView === "connection"
-            spacing: Style.space(12)
+            spacing: Style.space(8)
 
             Row {
               width: parent.width; height: Style.space(38); spacing: Style.space(8)
@@ -631,92 +739,472 @@ Panel {
                 Text { textFormat: Text.PlainText; anchors.centerIn: parent; text: "󰁍"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.icon }
                 MouseArea { id: connBackMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.leaveSubview() }
               }
-              Text { textFormat: Text.PlainText; width: parent.width - Style.space(42); anchors.verticalCenter: parent.verticalCenter; text: "Connection & Transport"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
-            }
-
-            Rectangle {
-              width: parent.width
-              height: Style.space(92)
-              radius: Style.cornerRadius
-              color: Style.hoverFillFor(root.foreground, Color.accent)
-              Column {
-                anchors.fill: parent
-                anchors.margins: Style.space(12)
-                spacing: Style.space(4)
-                Row {
-                  width: parent.width; spacing: Style.space(8)
-                  Text { textFormat: Text.PlainText; text: "Active Transport:"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
-                  Text { textFormat: Text.PlainText; text: meshcore.transportText; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall; font.bold: true }
-                  Rectangle {
-                    width: Style.space(8); height: width; radius: width / 2
-                    anchors.verticalCenter: parent.verticalCenter
-                    color: meshcore.connectionState === "connected" ? Color.accent : (meshcore.connectionState === "error" ? root.urgent : root.dim)
-                  }
-                  Text { textFormat: Text.PlainText; text: meshcore.statusText; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
-                }
-                Row {
-                  width: parent.width; spacing: Style.space(8)
-                  Text { textFormat: Text.PlainText; text: "Endpoint:"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
-                  Text {
-                    textFormat: Text.PlainText
-                    text: meshcore.transport === "tcp"
-                      ? (meshcore.tcpHost + ":" + meshcore.tcpPort)
-                      : (meshcore.transport === "ble"
-                          ? (meshcore.bleTarget || "Not configured")
-                          : meshcore.serialPort)
-                    color: root.foreground
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.bodySmall
-                  }
-                }
-                Row {
-                  width: parent.width; spacing: Style.space(8)
-                  Text { textFormat: Text.PlainText; text: "Companion:"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
-                  Text { textFormat: Text.PlainText; text: meshcore.companion ? meshcore.companion.name : "None"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
-                }
-              }
-            }
-
-            Rectangle {
-              width: parent.width
-              height: Style.space(72)
-              radius: Style.cornerRadius
-              color: Style.hoverFillFor(root.foreground, Color.accent)
-              Column {
-                anchors.fill: parent
-                anchors.margins: Style.space(12)
-                spacing: Style.space(4)
-                Row {
-                  width: parent.width; spacing: Style.space(8)
-                  Text { textFormat: Text.PlainText; text: "Radio:"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
-                  Text { textFormat: Text.PlainText; text: meshcore.radioText || "Awaiting radio status"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
-                }
-                Row {
-                  width: parent.width; spacing: Style.space(8)
-                  Text { textFormat: Text.PlainText; text: "Battery:"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
-                  Text { textFormat: Text.PlainText; text: meshcore.batteryText || "Unknown"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
-                }
-              }
-            }
-
-            Rectangle {
-              width: parent.width
-              height: Style.space(90)
-              radius: Style.cornerRadius
-              color: Style.hoverFillFor(root.foreground, Color.accent)
-              Column {
-                anchors.fill: parent
-                anchors.margins: Style.space(12)
-                spacing: Style.space(4)
-                Text { textFormat: Text.PlainText; text: "Configure Transports"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
+              Text { textFormat: Text.PlainText; width: parent.width - Style.space(80); anchors.verticalCenter: parent.verticalCenter; text: "Connection & Transport"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.body; font.bold: true }
+              Rectangle {
+                width: Style.space(34); height: width; radius: Style.cornerRadius
+                color: connReloadMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
+                anchors.verticalCenter: parent.verticalCenter
                 Text {
                   textFormat: Text.PlainText
+                  anchors.centerIn: parent; text: "󰑐"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.iconSmall
+                  RotationAnimator on rotation { running: meshcore.busy; from: 0; to: 360; duration: 850; loops: Animation.Infinite }
+                }
+                MouseArea { id: connReloadMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.refresh() }
+              }
+            }
+
+            Flickable {
+              id: connFlickable
+              width: parent.width
+              height: parent.height - Style.space(46)
+              contentWidth: width
+              contentHeight: connContent.implicitHeight + Style.space(12)
+              clip: true
+              boundsBehavior: Flickable.StopAtBounds
+
+              Column {
+                id: connContent
+                width: parent.width
+                spacing: Style.space(10)
+
+                Rectangle {
                   width: parent.width
-                  wrapMode: Text.WordWrap
-                  text: "Transport mode (USB Serial, TCP companion, or BLE) and endpoints can be customized in the Omarchy Bar Widget settings dialog."
-                  color: root.dim
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.caption
+                  implicitHeight: activeSummaryCol.implicitHeight + Style.space(20)
+                  radius: Style.cornerRadius
+                  color: Style.hoverFillFor(root.foreground, Color.accent)
+
+                  Column {
+                    id: activeSummaryCol
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.margins: Style.space(12)
+                    spacing: Style.space(4)
+
+                    Row {
+                      width: parent.width; spacing: Style.space(8)
+                      Rectangle {
+                        width: Style.space(10); height: width; radius: width / 2
+                        anchors.verticalCenter: parent.verticalCenter
+                        color: meshcore.connectionState === "connected"
+                          ? Color.accent
+                          : (meshcore.connectionState === "connecting"
+                              ? "#e5c07b"
+                              : (meshcore.connectionState === "error" ? root.urgent : root.dim))
+                      }
+                      Text {
+                        textFormat: Text.PlainText
+                        text: meshcore.companion ? meshcore.companion.name : (meshcore.connectionState === "connected" ? "Connected Node" : "No Companion Active")
+                        color: root.foreground
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.body
+                        font.bold: true
+                      }
+                      Text {
+                        textFormat: Text.PlainText
+                        text: "· " + meshcore.statusText
+                        color: root.dim
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.caption
+                        anchors.verticalCenter: parent.verticalCenter
+                      }
+                    }
+
+                    Row {
+                      width: parent.width; spacing: Style.space(8)
+                      Text { textFormat: Text.PlainText; text: "Active:"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.bodySmall }
+                      Text {
+                        textFormat: Text.PlainText
+                        text: meshcore.transportText + "  (" + (meshcore.transport === "tcp"
+                          ? (meshcore.tcpHost + ":" + meshcore.tcpPort)
+                          : (meshcore.transport === "ble"
+                              ? (meshcore.bleTarget || "Not configured")
+                              : meshcore.serialPort)) + ")"
+                        color: root.foreground
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.bodySmall
+                      }
+                    }
+
+                    Row {
+                      width: parent.width; spacing: Style.space(12)
+                      visible: meshcore.connectionState === "connected"
+                      Row {
+                        spacing: Style.space(4)
+                        Text { textFormat: Text.PlainText; text: "Radio:"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
+                        Text { textFormat: Text.PlainText; text: meshcore.radioText || "Ready"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
+                      }
+                      Row {
+                        spacing: Style.space(4)
+                        Text { textFormat: Text.PlainText; text: "Battery:"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
+                        Text { textFormat: Text.PlainText; text: meshcore.batteryText || "—"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.caption }
+                      }
+                    }
+                  }
+                }
+
+                Text { textFormat: Text.PlainText; text: "SELECT TRANSPORT"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
+
+                Row {
+                  width: parent.width
+                  height: Style.space(36)
+                  spacing: Style.space(6)
+
+                  Repeater {
+                    model: [
+                      { id: "USB", label: "USB Serial", icon: "󱐌" },
+                      { id: "TCP", label: "TCP / IP", icon: "󰌗" },
+                      { id: "BLE", label: "Bluetooth", icon: "󰂯" }
+                    ]
+                    delegate: Rectangle {
+                      id: transportBtn
+                      width: (parent.width - Style.space(12)) / 3
+                      height: parent.height
+                      radius: Style.cornerRadius
+                      color: root.editTransport === modelData.id
+                        ? Color.accent
+                        : (tMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent")
+                      border.width: root.editTransport === modelData.id ? 0 : 1
+                      border.color: root.editTransport === modelData.id ? "transparent" : Style.hoverFillFor(root.foreground, Color.accent)
+
+                      Row {
+                        anchors.centerIn: parent
+                        spacing: Style.space(4)
+                        Text {
+                          textFormat: Text.PlainText
+                          text: modelData.icon
+                          color: root.editTransport === modelData.id ? Color.background : root.foreground
+                          font.family: root.fontFamily
+                          font.pixelSize: Style.font.iconSmall
+                          anchors.verticalCenter: parent.verticalCenter
+                        }
+                        Text {
+                          textFormat: Text.PlainText
+                          text: modelData.label
+                          color: root.editTransport === modelData.id ? Color.background : root.foreground
+                          font.family: root.fontFamily
+                          font.pixelSize: Style.font.bodySmall
+                          font.bold: root.editTransport === modelData.id
+                          anchors.verticalCenter: parent.verticalCenter
+                        }
+                      }
+
+                      MouseArea {
+                        id: tMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.editTransport = modelData.id
+                      }
+                    }
+                  }
+                }
+
+                Column {
+                  width: parent.width
+                  visible: root.editTransport === "TCP"
+                  spacing: Style.space(6)
+
+                  Text { textFormat: Text.PlainText; text: "TCP HOST / IP ADDRESS"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
+                  TextField {
+                    width: parent.width
+                    placeholderText: "127.0.0.1 or 192.168.1.50"
+                    text: root.editTcpHost
+                    maximumLength: 253
+                    foreground: root.foreground
+                    accent: Color.accent
+                    onTextChanged: root.editTcpHost = text
+                    onAccepted: root.applyConnectionSettings()
+                  }
+
+                  Text { textFormat: Text.PlainText; text: "TCP PORT"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
+                  TextField {
+                    width: parent.width
+                    placeholderText: "5000"
+                    text: root.editTcpPort
+                    maximumLength: 5
+                    foreground: root.foreground
+                    accent: Color.accent
+                    onTextChanged: root.editTcpPort = text
+                    onAccepted: root.applyConnectionSettings()
+                  }
+
+                  Row {
+                    width: parent.width
+                    spacing: Style.space(8)
+
+                    Rectangle {
+                      height: Style.space(24)
+                      width: tcpLocalPresetText.implicitWidth + Style.space(16)
+                      radius: Style.cornerRadius
+                      color: tcpLocalPresetMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
+                      border.width: 1
+                      border.color: Style.hoverFillFor(root.foreground, Color.accent)
+                      Text {
+                        id: tcpLocalPresetText
+                        anchors.centerIn: parent
+                        text: "127.0.0.1:5000"
+                        textFormat: Text.PlainText
+                        color: root.foreground
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.caption
+                      }
+                      MouseArea {
+                        id: tcpLocalPresetMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                          root.editTcpHost = "127.0.0.1"
+                          root.editTcpPort = "5000"
+                        }
+                      }
+                    }
+
+                    Rectangle {
+                      height: Style.space(24)
+                      width: tcpDefaultPortText.implicitWidth + Style.space(16)
+                      radius: Style.cornerRadius
+                      color: tcpDefaultPortMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent"
+                      border.width: 1
+                      border.color: Style.hoverFillFor(root.foreground, Color.accent)
+                      Text {
+                        id: tcpDefaultPortText
+                        anchors.centerIn: parent
+                        text: "Default Port 5000"
+                        textFormat: Text.PlainText
+                        color: root.dim
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.caption
+                      }
+                      MouseArea {
+                        id: tcpDefaultPortMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.editTcpPort = "5000"
+                      }
+                    }
+                  }
+
+                  Text {
+                    textFormat: Text.PlainText
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    text: "Connect to a MeshCore node running over a TCP network socket (e.g. WiFi bridge or remote headless node)."
+                    color: root.dim
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                  }
+                }
+
+                Column {
+                  width: parent.width
+                  visible: root.editTransport === "USB"
+                  spacing: Style.space(6)
+
+                  Text { textFormat: Text.PlainText; text: "SERIAL DEVICE PORT"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
+                  TextField {
+                    width: parent.width
+                    placeholderText: "/dev/ttyACM0"
+                    text: root.editSerialPort
+                    maximumLength: 64
+                    foreground: root.foreground
+                    accent: Color.accent
+                    onTextChanged: root.editSerialPort = text
+                    onAccepted: root.applyConnectionSettings()
+                  }
+
+                  Row {
+                    width: parent.width
+                    spacing: Style.space(8)
+
+                    Repeater {
+                      model: ["/dev/ttyACM0", "/dev/ttyACM1", "/dev/ttyUSB0"]
+                      delegate: Rectangle {
+                        height: Style.space(24)
+                        width: devChipText.implicitWidth + Style.space(16)
+                        radius: Style.cornerRadius
+                        color: root.editSerialPort === modelData
+                          ? Color.accent
+                          : (chipMouse.containsMouse ? Style.hoverFillFor(root.foreground, Color.accent) : "transparent")
+                        border.width: root.editSerialPort === modelData ? 0 : 1
+                        border.color: Style.hoverFillFor(root.foreground, Color.accent)
+                        Text {
+                          id: devChipText
+                          anchors.centerIn: parent
+                          text: modelData
+                          textFormat: Text.PlainText
+                          color: root.editSerialPort === modelData ? Color.background : root.foreground
+                          font.family: root.fontFamily
+                          font.pixelSize: Style.font.caption
+                        }
+                        MouseArea {
+                          id: chipMouse
+                          anchors.fill: parent
+                          hoverEnabled: true
+                          cursorShape: Qt.PointingHandCursor
+                          onClicked: root.editSerialPort = modelData
+                        }
+                      }
+                    }
+                  }
+
+                  Text {
+                    textFormat: Text.PlainText
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    text: "Direct USB serial connection to your companion radio (e.g. Heltec V3, T-Beam, RAK)."
+                    color: root.dim
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                  }
+                }
+
+                Column {
+                  width: parent.width
+                  visible: root.editTransport === "BLE"
+                  spacing: Style.space(6)
+
+                  Text { textFormat: Text.PlainText; text: "BLUETOOTH DEVICE NAME OR ADDRESS"; color: root.dim; font.family: root.fontFamily; font.pixelSize: Style.font.caption; font.letterSpacing: 1 }
+                  TextField {
+                    width: parent.width
+                    placeholderText: "MeshCore-xxxx or Bluetooth MAC"
+                    text: root.editBleTarget
+                    maximumLength: 96
+                    foreground: root.foreground
+                    accent: Color.accent
+                    onTextChanged: root.editBleTarget = text
+                    onAccepted: root.applyConnectionSettings()
+                  }
+
+                  Row {
+                    width: parent.width
+                    height: Style.space(30)
+                    spacing: Style.space(8)
+
+                    Rectangle {
+                      width: Style.space(18); height: width; radius: 4
+                      anchors.verticalCenter: parent.verticalCenter
+                      color: root.editBlePair ? Color.accent : "transparent"
+                      border.width: 1
+                      border.color: root.editBlePair ? Color.accent : root.dim
+                      Text {
+                        anchors.centerIn: parent
+                        textFormat: Text.PlainText
+                        text: "✓"
+                        color: Color.background
+                        visible: root.editBlePair
+                        font.pixelSize: Style.font.caption
+                        font.bold: true
+                      }
+                      MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.editBlePair = !root.editBlePair
+                      }
+                    }
+                    Text {
+                      anchors.verticalCenter: parent.verticalCenter
+                      textFormat: Text.PlainText
+                      text: "Request OS Bluetooth pairing (-P)"
+                      color: root.foreground
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.bodySmall
+                      MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.editBlePair = !root.editBlePair
+                      }
+                    }
+                  }
+                }
+
+                Rectangle {
+                  width: parent.width
+                  visible: meshcore.lastError !== ""
+                  implicitHeight: errorRow.implicitHeight + Style.space(16)
+                  radius: Style.cornerRadius
+                  color: Style.hoverFillFor(root.urgent, root.urgent)
+                  border.width: 1
+                  border.color: root.urgent
+
+                  Row {
+                    id: errorRow
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.margins: Style.space(10)
+                    spacing: Style.space(8)
+
+                    Text {
+                      textFormat: Text.PlainText
+                      text: "󰅚"
+                      color: root.urgent
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.iconSmall
+                      anchors.verticalCenter: parent.verticalCenter
+                    }
+
+                    Text {
+                      width: parent.width - Style.space(32)
+                      textFormat: Text.PlainText
+                      wrapMode: Text.WordWrap
+                      text: meshcore.lastError
+                      color: root.urgent
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.bodySmall
+                    }
+                  }
+                }
+
+                Rectangle {
+                  width: parent.width
+                  height: Style.space(42)
+                  radius: Style.cornerRadius
+                  color: applyConnMouse.containsMouse || meshcore.connectionState === "connecting"
+                    ? Style.hoverFillFor(root.foreground, Color.accent)
+                    : "transparent"
+                  border.width: 1
+                  border.color: Color.accent
+                  opacity: meshcore.connectionState === "connecting" ? 0.6 : 1.0
+
+                  Row {
+                    anchors.centerIn: parent
+                    spacing: Style.space(8)
+                    Text {
+                      visible: meshcore.connectionState === "connecting"
+                      textFormat: Text.PlainText
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: "󰑐"
+                      color: Color.accent
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.iconSmall
+                      RotationAnimator on rotation { running: meshcore.connectionState === "connecting"; from: 0; to: 360; duration: 850; loops: Animation.Infinite }
+                    }
+                    Text {
+                      textFormat: Text.PlainText
+                      anchors.verticalCenter: parent.verticalCenter
+                      text: meshcore.connectionState === "connecting"
+                        ? "Connecting…"
+                        : (meshcore.connectionState === "connected" && meshcore.transport === (root.editTransport === "TCP" ? "tcp" : (root.editTransport === "BLE" ? "ble" : "serial"))
+                            ? "Reconnect " + root.editTransport
+                            : "Connect " + root.editTransport)
+                      color: Color.accent
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.body
+                      font.bold: true
+                    }
+                  }
+
+                  MouseArea {
+                    id: applyConnMouse
+                    anchors.fill: parent
+                    enabled: meshcore.connectionState !== "connecting"
+                    hoverEnabled: true
+                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                    onClicked: root.applyConnectionSettings()
+                  }
                 }
               }
             }

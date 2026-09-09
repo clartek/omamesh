@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1 - 2026-09-08
+
+- Added in-app Connection & Transport settings panel for dynamic TCP/IP, USB Serial, and BLE companion switching.
+- Added smart TCP endpoint normalization supporting `host:port`, IPv4/IPv6, and `tcp://` URL schemes.
+- Added real-time TCP diagnostic error messages (connection refused, DNS resolution failure, network unreachable, connection reset).
+- Fixed transport switching process lifecycle with SIGTERM escalation to prevent orphaned CLI processes.
+- Added direct "Configure Connection" access from disconnected panel view and quick keyboard shortcut (`c`).
+
 ## 1.0.0 - 2026-09-08
 
 - Added official MeshCore vector icon to the bar widget and panel header.

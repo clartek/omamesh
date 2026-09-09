@@ -17,6 +17,7 @@ BarWidget {
   function close() { if (panelLoader.item) panelLoader.item.close() }
   function togglePanel() { if (panelLoader.item) panelLoader.item.toggle() }
   function refresh() { if (panelLoader.item) panelLoader.item.refresh() }
+  function openConnection() { if (panelLoader.item) { panelLoader.item.open(); panelLoader.item.openConnectionDetails() } }
   function closeForPopoutSwitch() { if (panelLoader.item) panelLoader.item.closeForPopoutSwitch() }
 
   function injectPanel() {
