@@ -1,182 +1,161 @@
 # Omamesh
 
-Omamesh is an independent Omarchy Quattro bar plugin for MeshCore. It connects
-to a companion through `meshcore-cli` and provides a compact status indicator
-and an Omarchy-native panel inspired by the information hierarchy of the
-official MeshCore mobile app.
+<p align="center">
+  <img src="preview.png" alt="Omamesh - MeshCore bar companion for Omarchy" width="720">
+</p>
 
-## Status
+<p align="center">
+  <a href="https://plugins.omarchy.org/plugin.html?id=clartek.omamesh"><img src="https://img.shields.io/badge/Omarchy_Marketplace-clartek.omamesh-brightgreen.svg" alt="Omarchy Marketplace"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License"></a>
+  <a href="https://github.com/clartek/omamesh/releases"><img src="https://img.shields.io/badge/Release-v1.0.2-purple.svg" alt="Release"></a>
+  <a href="https://meshcore.org"><img src="https://img.shields.io/badge/MeshCore-Compatible-orange.svg" alt="MeshCore Compatible"></a>
+</p>
 
-Omamesh version 1.0 supports USB Serial, TCP companion, and BLE connections,
-contact and channel management, incoming and outgoing messaging with
-acknowledgments, sensor telemetry presentation, desktop notifications, and an
-interactive map view with offline grid and optional online street map tiles.
+**Omamesh** is an off-grid LoRa mesh networking companion for **Omarchy Quattro** desktop bars. Powered by `meshcore-cli`, it brings the visual hierarchy, node management, and messaging workflows of the official MeshCore companion directly into your native Linux bar.
+
+---
+
+## Highlights
+
+* 📡 **Multi-Transport Connectivity**: Continuous auto-reconnecting support for **USB Serial** (`/dev/ttyACM*`), **TCP/IP**, and **Bluetooth LE (BLE)** companions.
+* 💬 **Messaging with ACK Tracking**: Direct chats and channel broadcasts with verified radio delivery acknowledgments.
+* 🔔 **Desktop Notifications**: Instant desktop alerts for incoming direct messages and channel broadcasts.
+* 🗺️ **Interactive Slippy Map**: Real-time advertised-contact locator with Esri Dark Canvas basemap and offline coordinate grid modes.
+* 📊 **Telemetry & Diagnostics**: Query Cayenne LPP remote sensor metrics, monitor battery voltages, and inspect radio SNR/RSSI signal paths.
+* 🔒 **Security Hardened**: Built to Omarchy Quattro security standards—strict argument arrays (no shell invocation), PlainText rendering sinks, and bounded stream parsers.
+
+---
+
+## Feature Matrix
 
 | Feature | Status |
 | --- | --- |
-| Detect `meshcore-cli` | Working |
-| USB Serial Companion connection | Working |
-| TCP companion connection | Working |
-| BLE companion connection | Working |
-| Companion name and connection state | Working |
-| Companion battery and radio status | Working |
-| In-panel connection and transport inspector | Working |
-| Persistent event session and reconnect | Working |
-| Contact discovery and browsing | Working |
-| Configured channel browsing | Working |
-| Incoming direct and channel messages | Working |
-| Direct and channel conversations | Working |
-| Direct and channel sending with ACK tracking | Working |
-| Add and remove channels | Working |
-| Remove contacts | Working |
-| Remote node sensor telemetry | Working |
-| Advertised-coordinate overview | Working |
-| Slippy street map with zoom and pan | Working |
-| Desktop notifications for messages | Working |
+| Automatic CLI detection (`meshcore-cli`) | ✅ Working |
+| USB Serial companion connection | ✅ Working |
+| TCP/IP companion endpoint & auto-reconnect | ✅ Working |
+| Bluetooth LE (BLE) companion connection | ✅ Working |
+| Companion battery voltage & radio metrics | ✅ Working |
+| In-panel connection & transport inspector | ✅ Working |
+| Contact discovery, role filtering & search | ✅ Working |
+| Channel discovery, creation & deletion | ✅ Working |
+| Direct & channel messaging | ✅ Working |
+| Radio acknowledgment (ACK) tracking | ✅ Working |
+| Remote Cayenne LPP sensor telemetry | ✅ Working |
+| Interactive slippy street map (Esri Dark Canvas) | ✅ Working |
+| Offline coordinate grid mode | ✅ Working |
+| Native Omarchy desktop notifications | ✅ Working |
+
+---
 
 ## Requirements
 
-- Omarchy Quattro with the Quickshell-based shell
-- `meshcore-cli`
-- a MeshCore USB Serial Companion, TCP companion endpoint, or BLE companion
-- for USB, permission to read and write the companion's `/dev/ttyACM*` or
-  `/dev/ttyUSB*` device
+* **Omarchy Quattro** (with Quickshell-based shell)
+* [`meshcore-cli`](https://github.com/meshcore-dev/meshcore-cli) installed and accessible on `$PATH`
+* A MeshCore companion device connected via **USB Serial**, **TCP/IP**, or **BLE**
+* For USB serial, standard dialout/serial group permissions to `/dev/ttyACM*` or `/dev/ttyUSB*`
 
-If `meshcore-cli` is missing, the plugin remains loaded and displays
-`meshcore-cli not found`; it does not attempt companion commands. Install the
-CLI and refresh the panel to retry.
+> **Note**: If `meshcore-cli` is not found, the bar widget safely displays `meshcore-cli not found` and idles without spawning background processes.
+
+---
 
 ## Installation
 
-Clone the repository into Omarchy's user plugin directory:
+### Standard (Omarchy Marketplace)
+
+The recommended installation method via the [Omarchy Plugin Store](https://plugins.omarchy.org/plugin.html?id=clartek.omamesh):
 
 ```bash
-git clone https://github.com/clartek/omamesh.git \
-  ~/.config/omarchy/plugins/clartek.omamesh
+omarchy plugin add clartek.omamesh
+```
+
+### Manual (From Source)
+
+To install or develop from source:
+
+```bash
+git clone https://github.com/clartek/omamesh.git ~/.config/omarchy/plugins/clartek.omamesh
 omarchy plugin enable clartek.omamesh
 omarchy restart shell
 ```
 
-The widget defaults to the right side of the bar, USB transport, and
-`/dev/ttyACM0`. Plugin settings can select TCP or BLE and configure connection
-endpoints and timeout parameters.
+---
 
-## Controls
+## Controls & Keybindings
 
-- Click the bar icon to open or close the panel.
-- Middle-click the bar icon to refresh.
-- Press `R` or `Enter` in the panel to refresh.
-- Press `/` on Contacts or Channels to focus search.
-- Click "󰒋" in the header to inspect active transport, endpoints, radio status,
-  and battery voltage.
-- Open a Direct contact or channel to compose a message. Direct messages show
-  Delivered only after a matching acknowledgment. Channel messages show Sent
-  after the companion accepts them.
-- On Channels, use `+` to add a channel. Use the menu button on a channel to
-  open its settings. Removal requires a second confirmation and is disabled
-  for the public channel.
-- Use the menu button on a contact to view its details, request sensor
-  telemetry, or remove the contact. Contact removal also requires a second
-  confirmation.
-- On the Map tab, drag with the mouse to pan, use the floating zoom controls or
-  mouse wheel to zoom, click recenter to fit all contacts, or press `T` to toggle
-  between online street tiles and offline coordinate grid mode.
-- Press `H`/`L` or `1`/`2`/`3` to switch between Contacts, Channels, and Map.
-- Press `Tab`/`Shift+Tab` to switch Omarchy panels.
-- Press `Escape` to close the panel or return from subviews.
+Omamesh is designed for rapid keyboard and mouse navigation:
 
-## Network activity and privacy
+| Action | Shortcut / Gesture |
+| :--- | :--- |
+| **Toggle Panel** | Click bar icon or configured Omarchy bar toggle |
+| **Refresh Companion** | Middle-click bar icon, or press `R` / `Enter` inside panel |
+| **Search Contacts / Channels** | Press `/` on Contacts or Channels tab |
+| **Switch Tabs** | Press `1` / `2` / `3` or `H` / `L` (Contacts, Channels, Map) |
+| **Connection Inspector** | Click the transport icon (`󰒋`) in the header |
+| **Map Zoom & Pan** | Click-and-drag to pan; scroll wheel or `+` / `-` to zoom |
+| **Fit All Contacts** | Click the target crosshair (`󰆤`) on the Map tab |
+| **Toggle Map Tiles / Grid** | Press `T` on the Map tab |
+| **Back / Close** | Press `Escape` |
 
-Omamesh communicates with `meshcore-cli` locally on the system using argument
-arrays without invoking a shell.
+---
 
-When online map tiles are enabled (`enableMapTiles: true`), Omamesh fetches
-slippy map raster tiles over HTTPS from Esri
-(`server.arcgisonline.com`, port 443) or OpenStreetMap
-(`tile.openstreetmap.org`, port 443) according to the configured provider.
-No credentials, tokens, cookies, or device identifiers are sent with tile
-requests.
+## Network Activity & Privacy
 
-When online map tiles are disabled (`enableMapTiles: false`), Omamesh operates
-entirely offline in coordinate grid mode and makes no outbound network requests.
+* **Companion Traffic**: Omamesh communicates with `meshcore-cli` locally via bounded UNIX pipes. No credentials, tokens, or encryption keys are ever logged.
+* **Map Tiles**: When online tiles are enabled (`enableMapTiles: true`), raster basemap tiles are fetched over HTTPS from Esri (`server.arcgisonline.com:443`) or OpenStreetMap. No user identifiers or location telemetry are sent with tile requests.
+* **Offline Mode**: When online tiles are disabled, Omamesh operates 100% offline using a mathematical coordinate grid.
+* **Sensitive Data Protection**: Channel keys and secrets are immediately discarded upon normalization. Contact identifiers are hashed/shortened in UI sinks.
 
-Omamesh never logs message bodies, encryption keys, channel secrets, or
-complete device identifiers.
+---
 
-## Removing
+## Testing & Validation
 
-To remove the plugin:
-
-```bash
-omarchy plugin remove clartek.omamesh
-```
-
-This removes the plugin files in `~/.config/omarchy/plugins/clartek.omamesh`.
-Plugin settings stored in Omarchy `shell.json` under `clartek.omamesh` are
-managed by Omarchy.
-
-Omamesh writes no files to `/tmp`, `/var`, `/etc`, or the desktop keyring, and
-leaves no background daemons, units, or cron tasks running after removal.
-
-## Validate
+Run the automated test suite locally:
 
 ```bash
 ./scripts/check
 ```
 
-The checks validate metadata and fixtures, run pure model tests, exercise a
-deterministic persistent CLI session, test TCP and BLE transport argument
-handling, verify send and management transactions, validate the plugin with
-Omarchy, and check the working tree for whitespace errors.
+This verifies metadata syntax, executes pure `Model.js` unit tests, validates TCP/BLE/Serial transport sessions, runs message and sensor telemetry smoke tests, and verifies Omarchy plugin schema compliance.
 
-## Architecture and security
+---
 
-`meshcore-cli` is the only backend boundary. Omamesh does not implement serial,
-BLE, TCP, or MeshCore protocol handling directly in QML. Commands are passed to
-Quickshell as argument arrays without invoking a shell.
+## Removal
 
-CLI output is treated as untrusted input. The service validates JSON and
-normalizes connection, contact, and channel data before exposing it to the UI.
-Complete contact identifiers are shortened, and channel hashes and secrets are
-discarded during normalization. Message bodies, keys, secrets, and complete
-device identifiers must never be logged.
+To uninstall Omamesh:
 
-All QML Text sinks use explicit PlainText formatting to prevent rich text
-markup injection. Process outputs are collected using bounded streaming parsers
-with process-group termination and kill escalation.
+```bash
+omarchy plugin remove clartek.omamesh
+```
 
-See [`docs/architecture.md`](docs/architecture.md),
-[`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md), and
-[`docs/meshcore-cli-contract.md`](docs/meshcore-cli-contract.md) for details.
+Omamesh leaves no residual files in `/tmp`, `/var`, or `/etc`, creates no persistent systemd units, and touches no desktop keyrings.
 
-## Project layout
+---
+
+## Architecture
 
 ```text
-BarWidget.qml                   bar indicator and panel host
-Panel.qml                       keyboard-friendly dropdown surface
-MeshCoreService.qml             process lifecycle and normalized state
-Model.js                        pure validation and display helpers
-manifest.json                   plugin manifest and settings schema
-preview.png                     plugin marketplace preview image
-fixtures/                       sanitized offline development data
-tests/                          model and transport tests
-scripts/check                   local validation
-docs/architecture.md            transport and state design
-docs/DEVELOPMENT.md             development guidance and security rules
-docs/meshcore-cli-contract.md   verified backend behavior
+BarWidget.qml                   Compact bar indicator & panel host
+Panel.qml                       Keyboard-friendly companion dropdown surface
+MeshCoreService.qml             Process lifecycle, auto-reconnect & normalized state
+Model.js                        Pure validation, transport parsers & display helpers
+manifest.json                   Plugin manifest & settings schema
+preview.png                     High-contrast marketplace showcase
+fixtures/                       Sanitized offline fixture datasets
+tests/                          Transport, parsing, and model test suites
+scripts/check                   All-in-one local validation script
+docs/architecture.md            Transport and state architecture design
+docs/DEVELOPMENT.md             Development conventions and security policies
+docs/meshcore-cli-contract.md   Verified backend CLI behavior and semantics
 ```
+
+---
 
 ## Acknowledgments
 
-Omamesh is not affiliated with or endorsed by MeshCore or Liam Cottle. Its
-visual direction is inspired by Liam Cottle's official MeshCore companion app.
-Behavior and protocol semantics are checked first against the official MeshCore
-documentation, the installed `meshcore-cli` implementation, and
-[`meshcore.js`](https://github.com/meshcore-dev/meshcore.js). The MIT-licensed
-[`meshcore-open`](https://github.com/zjs81/meshcore-open) project is a secondary
-reference for application-level behavior where upstream documentation is
-silent.
+Omamesh is an independent community project. Its visual hierarchy is inspired by Liam Cottle's official MeshCore companion app. Protocol semantics are validated against official MeshCore documentation, `meshcore-cli`, and [`meshcore.js`](https://github.com/meshcore-dev/meshcore.js).
+
+---
 
 ## License
 
-Omamesh is available under the [MIT License](LICENSE).
+Distributed under the [MIT License](LICENSE).
