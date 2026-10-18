@@ -30,6 +30,7 @@ Item {
   property bool _probeStopping: false
   property bool _snapshotPending: false
   property string _streamBuffer: ""
+  property var _streamParseState: null
   property string _expectedDocument: ""
   property int _sendCounter: 0
   property bool _sendCapturing: false
@@ -94,6 +95,11 @@ Item {
   readonly property bool busy: root._refreshPipeline || root._snapshotPending || root.sending || root.managing || root.requestingTelemetry || backendProbe.running || companionProbe.running || dataProbe.running
   readonly property bool live: eventSession.running && root._sessionReady
 
+  function resetStreamParser() {
+    root._streamBuffer = ""
+    root._streamParseState = null
+  }
+
   function refresh() {
     if (root.busy) return
     if (eventSession.running) {
@@ -150,7 +156,7 @@ Item {
     root._sessionStopping = false
     root._sessionReady = false
     root._snapshotPending = false
-    root._streamBuffer = ""
+    root.resetStreamParser()
     root._expectedDocument = ""
     eventSession.command = ["meshcore-cli", "-j", "-c", "off"].concat(root.connectionArgs).concat(["-i"])
     eventSession.running = true
@@ -540,7 +546,7 @@ Item {
       var telemetryId = root._telemetryCounter
       if (text.indexOf("__OMAMESH_TELEMETRY_START_" + telemetryId + "__") !== -1) {
         root._telemetryCapturing = true
-        root._streamBuffer = ""
+        root.resetStreamParser()
         return
       }
       if (text.indexOf("__OMAMESH_TELEMETRY_END_" + telemetryId + "__") !== -1) {
@@ -555,7 +561,7 @@ Item {
       var managementId = root._managementTransaction.id
       if (text.indexOf("__OMAMESH_MANAGE_START_" + managementId + "__") !== -1) {
         root._managementCapturing = true
-        root._streamBuffer = ""
+        root.resetStreamParser()
         return
       }
       if (text.indexOf("__OMAMESH_MANAGE_END_" + managementId + "__") !== -1) {
@@ -576,7 +582,7 @@ Item {
       var sendId = root._sendTransaction.id
       if (text.indexOf("__OMAMESH_SEND_START_" + sendId + "__") !== -1) {
         root._sendCapturing = true
-        root._streamBuffer = ""
+        root.resetStreamParser()
         return
       }
       if (text.indexOf("__OMAMESH_SEND_END_" + sendId + "__") !== -1) {
@@ -605,9 +611,13 @@ Item {
       root._expectedDocument = "radio"
 
     root._streamBuffer += text + "\n"
-    if (root._streamBuffer.length > 262144) root._streamBuffer = ""
-    var parsed = Model.extractJsonDocuments(root._streamBuffer)
+    if (root._streamBuffer.length > 262144) {
+      root.resetStreamParser()
+      return
+    }
+    var parsed = Model.extractJsonDocuments(root._streamBuffer, root._streamParseState)
     root._streamBuffer = parsed.remainder
+    root._streamParseState = parsed.continuation
     for (var i = 0; i < parsed.documents.length; i++)
       root.handleStreamDocument(parsed.documents[i])
   }
@@ -812,7 +822,7 @@ Item {
       root._sessionReady = false
       root._snapshotPending = false
       root._expectedDocument = ""
-      root._streamBuffer = ""
+      root.resetStreamParser()
       snapshotTimeout.stop()
       if (root.sending) root.failSend("The companion connection was lost while sending")
       if (root.managing) root.failManagement("The companion connection was lost while applying the change")
@@ -868,7 +878,7 @@ Item {
     onTriggered: {
       root._snapshotPending = false
       root._expectedDocument = ""
-      root._streamBuffer = ""
+      root.resetStreamParser()
       root.lastError = "Could not refresh companion data"
     }
   }

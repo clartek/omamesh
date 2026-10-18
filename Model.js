@@ -146,24 +146,43 @@ function _parseJson(raw) {
   catch (e) { return null }
 }
 
-function extractJsonDocuments(raw) {
+function extractJsonDocuments(raw, continuation) {
   var input = String(raw || "")
   var documents = []
   var cursor = 0
+  // A pretty-printed response arrives one line at a time. Resume its scan
+  // instead of walking the whole accumulated document for every new line.
+  var resume = continuation && continuation.offset > 0
+    && continuation.offset <= input.length && continuation.stack.length > 0
+    ? continuation : null
   while (cursor < input.length) {
-    var objectStart = input.indexOf("{", cursor)
-    var arrayStart = input.indexOf("[", cursor)
     var start
-    if (objectStart < 0) start = arrayStart
-    else if (arrayStart < 0) start = objectStart
-    else start = Math.min(objectStart, arrayStart)
-    if (start < 0) return { documents: documents, remainder: "" }
-
-    var stack = []
-    var quoted = false
-    var escaped = false
+    var scanFrom
+    var stack
+    var quoted
+    var escaped
+    if (resume) {
+      start = 0
+      scanFrom = resume.offset
+      stack = resume.stack
+      quoted = resume.quoted
+      escaped = resume.escaped
+      resume = null
+    } else {
+      var objectStart = input.indexOf("{", cursor)
+      var arrayStart = input.indexOf("[", cursor)
+      if (objectStart < 0) start = arrayStart
+      else if (arrayStart < 0) start = objectStart
+      else start = Math.min(objectStart, arrayStart)
+      if (start < 0) return { documents: documents, remainder: "", continuation: null }
+      scanFrom = start
+      stack = []
+      quoted = false
+      escaped = false
+    }
     var complete = -1
-    for (var i = start; i < input.length; i++) {
+    var malformed = false
+    for (var i = scanFrom; i < input.length; i++) {
       var ch = input.charAt(i)
       if (quoted) {
         if (escaped) escaped = false
@@ -174,19 +193,25 @@ function extractJsonDocuments(raw) {
       if (ch === '"') quoted = true
       else if (ch === "{" || ch === "[") stack.push(ch)
       else if (ch === "}" || ch === "]") {
-        if (stack.length === 0) break
+        if (stack.length === 0) { malformed = true; break }
         var opener = stack.pop()
-        if ((opener === "{" && ch !== "}") || (opener === "[" && ch !== "]")) break
+        if ((opener === "{" && ch !== "}") || (opener === "[" && ch !== "]")) { malformed = true; break }
         if (stack.length === 0) { complete = i + 1; break }
       }
     }
-    if (complete < 0) return { documents: documents, remainder: input.substring(start) }
+    if (complete < 0) return {
+      documents: documents,
+      remainder: input.substring(start),
+      continuation: malformed ? null : {
+        offset: input.length - start, stack: stack, quoted: quoted, escaped: escaped
+      }
+    }
     var candidate = input.substring(start, complete)
     try { documents.push(JSON.parse(candidate)) }
     catch (e) {}
     cursor = complete
   }
-  return { documents: documents, remainder: "" }
+  return { documents: documents, remainder: "", continuation: null }
 }
 
 function _text(value, fallback, maxLength) {

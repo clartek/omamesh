@@ -95,6 +95,53 @@ assert.equal(streamed.remainder, "")
 streamed = model.extractJsonDocuments('prompt {"partial":')
 assert.equal(streamed.documents.length, 0)
 assert.equal(streamed.remainder, '{"partial":')
+
+// Pretty-printed companion responses must not rescan their earlier lines.
+// Count character reads rather than depending on machine-specific timings.
+const incrementalModel = {}
+vm.createContext(incrementalModel)
+vm.runInContext(source, incrementalModel, { filename: "Model.js" })
+vm.runInContext(`
+  globalThis.parserCharacterReads = 0
+  const originalCharAt = String.prototype.charAt
+  String.prototype.charAt = function(index) {
+    parserCharacterReads++
+    return originalCharAt.call(this, index)
+  }
+`, incrementalModel)
+const snapshot = {
+  contacts: Array.from({ length: 200 }, (_, index) => ({
+    name: `Contact ${index}`, detail: 'braces {[]} and escaped "quotes" \\ remain text'
+  }))
+}
+const fragmentedInput = `Radio> ${JSON.stringify(snapshot, null, 2)}\nRadio> [{"ok":true}]\n`
+let pendingJson = ""
+let parseState = null
+const incrementalDocuments = []
+for (const fragment of fragmentedInput.match(/[^\n]*\n/g)) {
+  const result = incrementalModel.extractJsonDocuments(pendingJson + fragment, parseState)
+  incrementalDocuments.push(...result.documents)
+  pendingJson = result.remainder
+  parseState = result.continuation
+}
+assert.deepEqual(JSON.parse(JSON.stringify(incrementalDocuments)), [snapshot, [{ ok: true }]])
+assert.equal(pendingJson, "")
+assert.equal(parseState, null)
+assert.ok(incrementalModel.parserCharacterReads <= fragmentedInput.length)
+
+// Quote/escape state also has to survive a fragment ending inside a string.
+pendingJson = ""
+parseState = null
+const escapedDocument = JSON.stringify({ text: 'a "quote", a \\ slash and a } bracket' })
+let escapedResult
+for (const character of escapedDocument) {
+  escapedResult = model.extractJsonDocuments(pendingJson + character, parseState)
+  pendingJson = escapedResult.remainder
+  parseState = escapedResult.continuation
+}
+assert.deepEqual(JSON.parse(JSON.stringify(escapedResult.documents)), [JSON.parse(escapedDocument)])
+assert.equal(parseState, null)
+
 let channels = model.parseChannels(JSON.stringify([
   { channel_idx: 0, channel_name: "Public", channel_secret: "must-not-escape" },
   { channel_idx: 1, channel_name: "#local", channel_secret: "must-not-escape" }

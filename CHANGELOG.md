@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.3 - 2026-10-17
+
+- Fixed high desktop shell CPU usage and delayed launcher responses while receiving large, pretty-printed companion responses by resuming JSON parsing between fragments.
+- Reset parser state whenever a connection, transaction, timeout, or stream buffer limit resets the incoming data.
+- Added regression coverage for large responses arriving line by line and quoted strings split across fragments.
+
 ## 1.0.2 - 2026-09-08
 
 - Added continuous auto-reconnection loop for USB Serial, TCP/IP, and Bluetooth LE companions when connections drop or fail.
