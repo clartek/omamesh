@@ -61,16 +61,20 @@ Panel {
   }
   property bool mapTilesActive: root.settings && root.settings.enableMapTiles !== undefined ? root.settings.enableMapTiles : true
   readonly property string mapTileProvider: root.settings && root.settings.mapTileProvider ? root.settings.mapTileProvider : "carto-dark"
-  readonly property var mapLocatedNodes: Model.filterContacts(meshcore.nodes, "").filter(function(n) { return n && n.hasLocation })
-  readonly property var mapProjectedNodes: Model.projectMapNodes(
+  // Keep the live service running while closed, without rebuilding hidden views.
+  readonly property bool mapViewActive: root.opened && !root.hasSubview && root.selectedTab === 2
+  readonly property var mapLocatedNodes: root.mapViewActive
+    ? Model.filterContacts(meshcore.nodes, "").filter(function(n) { return n && n.hasLocation })
+    : []
+  readonly property var mapProjectedNodes: root.mapViewActive ? Model.projectMapNodes(
     meshcore.nodes,
     root.mapCenterLat,
     root.mapCenterLon,
     root.mapZoom,
     coordinateMap ? coordinateMap.width : 400,
     coordinateMap ? coordinateMap.height : 350
-  )
-  readonly property var mapTiles: root.mapTilesActive && root.selectedTab === 2
+  ) : []
+  readonly property var mapTiles: root.mapViewActive && root.mapTilesActive
     ? Model.calculateTileGrid(
         root.mapCenterLat,
         root.mapCenterLon,
@@ -81,10 +85,12 @@ Panel {
       )
     : []
   readonly property bool hasSubview: root.conversationId !== "" || root.detailNode !== null || root.managementView !== ""
-  readonly property var conversationMessages: Model.messagesForConversation(meshcore.messages, conversationId)
-  readonly property var filteredNodes: Model.filterContacts(meshcore.nodes, searchQuery, contactTypeFilter)
-  readonly property var filteredChannels: Model.filterByText(meshcore.channels, searchQuery)
-  readonly property var mappedNodes: Model.mapPoints(meshcore.nodes)
+  readonly property var conversationMessages: root.opened && root.conversationId !== ""
+    ? Model.messagesForConversation(meshcore.messages, conversationId) : []
+  readonly property var filteredNodes: root.opened && !root.hasSubview && root.selectedTab === 0
+    ? Model.filterContacts(meshcore.nodes, searchQuery, contactTypeFilter) : []
+  readonly property var filteredChannels: root.opened && !root.hasSubview && root.selectedTab === 1
+    ? Model.filterByText(meshcore.channels, searchQuery) : []
   readonly property var barIdentity: hostWidget || root
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property color urgent: bar ? bar.urgent : Color.urgent
@@ -388,7 +394,7 @@ Panel {
             Text {
               textFormat: Text.PlainText
               anchors.centerIn: parent; text: "󰑐"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.icon
-              RotationAnimator on rotation { running: meshcore.busy; from: 0; to: 360; duration: 850; loops: Animation.Infinite }
+              RotationAnimator on rotation { running: root.opened && meshcore.busy; from: 0; to: 360; duration: 850; loops: Animation.Infinite }
             }
             MouseArea { id: refreshArea; anchors.fill: parent; enabled: !meshcore.busy; hoverEnabled: true; cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor; onClicked: meshcore.refresh() }
           }
@@ -784,7 +790,7 @@ Panel {
                 Text {
                   textFormat: Text.PlainText
                   anchors.centerIn: parent; text: "󰑐"; color: root.foreground; font.family: root.fontFamily; font.pixelSize: Style.font.iconSmall
-                  RotationAnimator on rotation { running: meshcore.busy; from: 0; to: 360; duration: 850; loops: Animation.Infinite }
+                  RotationAnimator on rotation { running: root.opened && root.managementView === "connection" && meshcore.busy; from: 0; to: 360; duration: 850; loops: Animation.Infinite }
                 }
                 MouseArea { id: connReloadMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.refresh() }
               }

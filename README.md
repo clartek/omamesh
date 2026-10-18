@@ -7,7 +7,7 @@
 <p align="center">
   <a href="https://plugins.omarchy.org/plugin.html?id=clartek.omamesh"><img src="https://img.shields.io/badge/Omarchy_Marketplace-clartek.omamesh-brightgreen.svg" alt="Omarchy Marketplace"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License"></a>
-  <a href="https://github.com/clartek/omamesh/releases"><img src="https://img.shields.io/badge/Release-v1.0.3-purple.svg" alt="Release"></a>
+  <a href="https://github.com/clartek/omamesh/releases"><img src="https://img.shields.io/badge/Release-v1.0.4-purple.svg" alt="Release"></a>
   <a href="https://meshcore.org"><img src="https://img.shields.io/badge/MeshCore-Compatible-orange.svg" alt="MeshCore Compatible"></a>
 </p>
 

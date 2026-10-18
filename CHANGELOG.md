@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.4 - 2026-10-18
+
+- Further reduced refresh CPU usage by retaining separate JSON fragments and joining each response only once, avoiding repeated copies of the growing response through QML string properties.
+- Paused hidden contact, channel, conversation, and map models, map tile loading, and refresh animations until their views are open.
+- Preserved live message subscriptions and the configured refresh interval.
+- Added regression coverage for fragment assembly, empty fragments, malformed documents, and buffer limit recovery.
+
 ## 1.0.3 - 2026-10-17
 
 - Fixed high desktop shell CPU usage and delayed launcher responses while receiving large, pretty-printed companion responses by resuming JSON parsing between fragments.

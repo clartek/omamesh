@@ -146,72 +146,67 @@ function _parseJson(raw) {
   catch (e) { return null }
 }
 
-function extractJsonDocuments(raw, continuation) {
+function createJsonStreamParser(maxLength) {
+  var limit = Number(maxLength)
+  if (!isFinite(limit) || limit < 1) limit = 262144
+  return { limit: Math.min(262144, Math.floor(limit)), chunks: [], size: 0,
+    stack: [], quoted: false, escaped: false }
+}
+
+function _resetJsonStreamParser(parser) {
+  parser.chunks = []
+  parser.size = 0
+  parser.stack = []
+  parser.quoted = false
+  parser.escaped = false
+}
+
+function appendJsonStream(parser, raw) {
   var input = String(raw || "")
   var documents = []
-  var cursor = 0
-  // A pretty-printed response arrives one line at a time. Resume its scan
-  // instead of walking the whole accumulated document for every new line.
-  var resume = continuation && continuation.offset > 0
-    && continuation.offset <= input.length && continuation.stack.length > 0
-    ? continuation : null
-  while (cursor < input.length) {
-    var start
-    var scanFrom
-    var stack
-    var quoted
-    var escaped
-    if (resume) {
-      start = 0
-      scanFrom = resume.offset
-      stack = resume.stack
-      quoted = resume.quoted
-      escaped = resume.escaped
-      resume = null
-    } else {
-      var objectStart = input.indexOf("{", cursor)
-      var arrayStart = input.indexOf("[", cursor)
-      if (objectStart < 0) start = arrayStart
-      else if (arrayStart < 0) start = objectStart
-      else start = Math.min(objectStart, arrayStart)
-      if (start < 0) return { documents: documents, remainder: "", continuation: null }
-      scanFrom = start
-      stack = []
-      quoted = false
-      escaped = false
-    }
-    var complete = -1
-    var malformed = false
-    for (var i = scanFrom; i < input.length; i++) {
-      var ch = input.charAt(i)
-      if (quoted) {
-        if (escaped) escaped = false
-        else if (ch === "\\") escaped = true
-        else if (ch === '"') quoted = false
-        continue
-      }
-      if (ch === '"') quoted = true
-      else if (ch === "{" || ch === "[") stack.push(ch)
-      else if (ch === "}" || ch === "]") {
-        if (stack.length === 0) { malformed = true; break }
-        var opener = stack.pop()
-        if ((opener === "{" && ch !== "}") || (opener === "[" && ch !== "]")) { malformed = true; break }
-        if (stack.length === 0) { complete = i + 1; break }
-      }
-    }
-    if (complete < 0) return {
-      documents: documents,
-      remainder: input.substring(start),
-      continuation: malformed ? null : {
-        offset: input.length - start, stack: stack, quoted: quoted, escaped: escaped
-      }
-    }
-    var candidate = input.substring(start, complete)
-    try { documents.push(JSON.parse(candidate)) }
-    catch (e) {}
-    cursor = complete
+  if (input.length === 0) return documents
+  if (parser.size + input.length > parser.limit) {
+    _resetJsonStreamParser(parser)
+    return documents
   }
-  return { documents: documents, remainder: "", continuation: null }
+  // Retain separate fragments until a document is complete. Passing a growing
+  // string through a QML string property for every line repeatedly copies it.
+  var start = parser.stack.length > 0 ? 0 : -1
+  for (var i = 0; i < input.length; i++) {
+    var ch = input.charAt(i)
+    if (start < 0) {
+      if (ch !== "{" && ch !== "[") continue
+      start = i
+    }
+    if (parser.quoted) {
+      if (parser.escaped) parser.escaped = false
+      else if (ch === "\\") parser.escaped = true
+      else if (ch === '"') parser.quoted = false
+      continue
+    }
+    if (ch === '"') parser.quoted = true
+    else if (ch === "{" || ch === "[") parser.stack.push(ch)
+    else if (ch === "}" || ch === "]") {
+      var opener = parser.stack.pop()
+      if ((opener === "{" && ch !== "}") || (opener === "[" && ch !== "]")) {
+        _resetJsonStreamParser(parser)
+        return documents
+      }
+      if (parser.stack.length === 0) {
+        parser.chunks.push(input.substring(start, i + 1))
+        try { documents.push(JSON.parse(parser.chunks.join(""))) }
+        catch (e) {}
+        _resetJsonStreamParser(parser)
+        start = -1
+      }
+    }
+  }
+  if (start >= 0) {
+    var fragment = input.substring(start)
+    parser.chunks.push(fragment)
+    parser.size += fragment.length
+  }
+  return documents
 }
 
 function _text(value, fallback, maxLength) {

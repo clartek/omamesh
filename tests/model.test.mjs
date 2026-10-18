@@ -87,60 +87,82 @@ let noLocation = model.parseContacts(JSON.stringify({
 assert.equal(noLocation.items[0].hasLocation, false)
 assert.equal(model.locationLabel(noLocation.items[0]), "Not advertised")
 assert.equal(model.parseContacts("[]").ok, false)
-let streamed = model.extractJsonDocuments('Radio> {\n"name":"brace } inside"\n}\nRadio> [{"ok":true}]')
-assert.equal(streamed.documents.length, 2)
-assert.equal(streamed.documents[0].name, "brace } inside")
-assert.equal(streamed.documents[1][0].ok, true)
-assert.equal(streamed.remainder, "")
-streamed = model.extractJsonDocuments('prompt {"partial":')
-assert.equal(streamed.documents.length, 0)
-assert.equal(streamed.remainder, '{"partial":')
+let parser = model.createJsonStreamParser()
+let streamed = model.appendJsonStream(parser, 'Radio> {\n"name":"brace } inside"\n}\nRadio> [{"ok":true}]')
+assert.equal(streamed.length, 2)
+assert.equal(streamed[0].name, "brace } inside")
+assert.equal(streamed[1][0].ok, true)
+assert.equal(parser.size, 0)
+streamed = model.appendJsonStream(parser, 'prompt {"partial":')
+assert.equal(streamed.length, 0)
+assert.equal(parser.chunks.join(""), '{"partial":')
 
 // Pretty-printed companion responses must not rescan their earlier lines.
 // Count character reads rather than depending on machine-specific timings.
-const incrementalModel = {}
-vm.createContext(incrementalModel)
-vm.runInContext(source, incrementalModel, { filename: "Model.js" })
-vm.runInContext(`
-  globalThis.parserCharacterReads = 0
-  const originalCharAt = String.prototype.charAt
-  String.prototype.charAt = function(index) {
-    parserCharacterReads++
-    return originalCharAt.call(this, index)
-  }
-`, incrementalModel)
 const snapshot = {
   contacts: Array.from({ length: 200 }, (_, index) => ({
     name: `Contact ${index}`, detail: 'braces {[]} and escaped "quotes" \\ remain text'
   }))
 }
 const fragmentedInput = `Radio> ${JSON.stringify(snapshot, null, 2)}\nRadio> [{"ok":true}]\n`
-let pendingJson = ""
-let parseState = null
-const incrementalDocuments = []
-for (const fragment of fragmentedInput.match(/[^\n]*\n/g)) {
-  const result = incrementalModel.extractJsonDocuments(pendingJson + fragment, parseState)
-  incrementalDocuments.push(...result.documents)
-  pendingJson = result.remainder
-  parseState = result.continuation
-}
-assert.deepEqual(JSON.parse(JSON.stringify(incrementalDocuments)), [snapshot, [{ ok: true }]])
-assert.equal(pendingJson, "")
-assert.equal(parseState, null)
-assert.ok(incrementalModel.parserCharacterReads <= fragmentedInput.length)
-
-// Quote/escape state also has to survive a fragment ending inside a string.
-pendingJson = ""
-parseState = null
 const escapedDocument = JSON.stringify({ text: 'a "quote", a \\ slash and a } bracket' })
-let escapedResult
-for (const character of escapedDocument) {
-  escapedResult = model.extractJsonDocuments(pendingJson + character, parseState)
-  pendingJson = escapedResult.remainder
-  parseState = escapedResult.continuation
+
+// The live parser retains fragments without joining a growing buffer for each
+// line. Only completed documents may trigger a join and JSON parse.
+const streamModel = {}
+vm.createContext(streamModel)
+vm.runInContext(source, streamModel, { filename: "Model.js" })
+vm.runInContext(`
+  globalThis.streamCharacterReads = 0
+  globalThis.streamBufferJoins = 0
+  const streamCharAt = String.prototype.charAt
+  const streamJoin = Array.prototype.join
+  String.prototype.charAt = function(index) {
+    streamCharacterReads++
+    return streamCharAt.call(this, index)
+  }
+  Array.prototype.join = function(separator) {
+    streamBufferJoins++
+    return streamJoin.call(this, separator)
+  }
+`, streamModel)
+let jsonStream = streamModel.createJsonStreamParser()
+const chunkDocuments = []
+for (const fragment of fragmentedInput.match(/[^\n]*\n/g)) {
+  const completed = streamModel.appendJsonStream(jsonStream, fragment)
+  chunkDocuments.push(...completed)
 }
-assert.deepEqual(JSON.parse(JSON.stringify(escapedResult.documents)), [JSON.parse(escapedDocument)])
-assert.equal(parseState, null)
+assert.deepEqual(JSON.parse(JSON.stringify(chunkDocuments)), [snapshot, [{ ok: true }]])
+assert.equal(jsonStream.size, 0)
+assert.equal(jsonStream.chunks.length, 0)
+assert.ok(streamModel.streamCharacterReads <= fragmentedInput.length)
+assert.equal(streamModel.streamBufferJoins, 2)
+
+jsonStream = model.createJsonStreamParser()
+let chunkResult
+for (const character of escapedDocument)
+  chunkResult = model.appendJsonStream(jsonStream, character)
+assert.deepEqual(JSON.parse(JSON.stringify(chunkResult)), [JSON.parse(escapedDocument)])
+assert.equal(jsonStream.size, 0)
+
+jsonStream = model.createJsonStreamParser()
+model.appendJsonStream(jsonStream, '{"waiting":')
+const retainedChunks = jsonStream.chunks.length
+for (let empty = 0; empty < 100; empty++) model.appendJsonStream(jsonStream, "")
+assert.equal(jsonStream.chunks.length, retainedChunks)
+assert.deepEqual(JSON.parse(JSON.stringify(model.appendJsonStream(jsonStream, 'true}'))), [{ waiting: true }])
+
+// Malformed or oversized data must not leave stale quote or bracket state.
+jsonStream = model.createJsonStreamParser(32)
+assert.equal(model.appendJsonStream(jsonStream, '{"partial":"').length, 0)
+assert.equal(model.appendJsonStream(jsonStream, "x".repeat(33)).length, 0)
+assert.equal(jsonStream.size, 0)
+assert.equal(jsonStream.stack.length, 0)
+assert.equal(jsonStream.quoted, false)
+assert.deepEqual(JSON.parse(JSON.stringify(model.appendJsonStream(jsonStream, '{"ok":true}'))), [{ ok: true }])
+assert.equal(model.appendJsonStream(jsonStream, '{"broken":]').length, 0)
+assert.equal(jsonStream.size, 0)
+assert.deepEqual(JSON.parse(JSON.stringify(model.appendJsonStream(jsonStream, '[1,2]{}'))), [[1, 2], {}])
 
 let channels = model.parseChannels(JSON.stringify([
   { channel_idx: 0, channel_name: "Public", channel_secret: "must-not-escape" },

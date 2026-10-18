@@ -29,8 +29,7 @@ Item {
   property bool _restartAfterStop: false
   property bool _probeStopping: false
   property bool _snapshotPending: false
-  property string _streamBuffer: ""
-  property var _streamParseState: null
+  property var _streamParser: Model.createJsonStreamParser()
   property string _expectedDocument: ""
   property int _sendCounter: 0
   property bool _sendCapturing: false
@@ -96,8 +95,7 @@ Item {
   readonly property bool live: eventSession.running && root._sessionReady
 
   function resetStreamParser() {
-    root._streamBuffer = ""
-    root._streamParseState = null
+    root._streamParser = Model.createJsonStreamParser()
   }
 
   function refresh() {
@@ -610,16 +608,9 @@ Item {
     if (text.indexOf("__OMAMESH_RADIO__") !== -1)
       root._expectedDocument = "radio"
 
-    root._streamBuffer += text + "\n"
-    if (root._streamBuffer.length > 262144) {
-      root.resetStreamParser()
-      return
-    }
-    var parsed = Model.extractJsonDocuments(root._streamBuffer, root._streamParseState)
-    root._streamBuffer = parsed.remainder
-    root._streamParseState = parsed.continuation
-    for (var i = 0; i < parsed.documents.length; i++)
-      root.handleStreamDocument(parsed.documents[i])
+    var documents = Model.appendJsonStream(root._streamParser, text + "\n")
+    for (var i = 0; i < documents.length; i++)
+      root.handleStreamDocument(documents[i])
   }
 
   function runDataPhase(phase) {

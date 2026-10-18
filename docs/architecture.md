@@ -19,6 +19,12 @@ The UI must not know transport-specific command details. It requests operations
 from `MeshCoreService`, which owns connection state and converts backend output
 into stable companion, node, channel, and message models.
 
+The persistent session delivers messages independently of periodic metadata
+snapshots. Incoming JSON is scanned one fragment at a time, with a bounded
+fragment buffer joined only when a complete document is ready to parse. Closed
+panel views leave their list and map models empty while the service continues
+receiving messages and refreshing its normalized data at the configured interval.
+
 Transport selection is normalized into an argument array before process
 launch. USB uses `-s PORT` and TCP uses `-t HOST -p PORT`. The persistent
 session, snapshots, messaging, and management state machines are shared across
